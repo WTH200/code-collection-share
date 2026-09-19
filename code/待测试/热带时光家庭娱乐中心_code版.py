@@ -72,9 +72,11 @@ API_BASE = "https://ytb2.zs-shiruan.cn/api"
 LOGIN_BASE = "https://ytb2.zs-shiruan.cn/api-v2"
 STORE_ID = "2014496"
 SIGN_ACT_ID = "13417"
+CACHE_DIR = os.environ.get("CODE_CACHE_DIR", os.path.join(os.path.expanduser("~"), "Documents", "写代码"))
 
-COOKIE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ytb2cookie.json")
+os.makedirs(CACHE_DIR, exist_ok=True)
 
+COOKIE_FILE = os.path.join(CACHE_DIR, "ytb2cookie.json")
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) MicroMessenger/3.9.12 "
     "MiniProgramEnv/Windows WindowsWechat/WMPF"

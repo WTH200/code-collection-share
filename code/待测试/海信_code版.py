@@ -83,9 +83,11 @@ SIGN_URL = f"{CPS_BASE}/customerAth/activity-manage/activityUser/participate"
 GAME_INFO_URL = f"{CPS_BASE}/customerAth/activity-manage/activityUser/getActivityInfo?code=a55ca53d96bd43be81c0df7ced7ef2b0"
 PARTY_EXCHANGE_URL = f"{CPS_BASE}/customerAth/activity-manage/activityUser/partyExchange"
 SIGN_ACTIVITY_CODE = "74f51fd29cea445e9b95eb0dd14fba40"
+CACHE_DIR = os.environ.get("CODE_CACHE_DIR", os.path.join(os.path.expanduser("~"), "Documents", "写代码"))
 
-COOKIE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "hisencookie.json")
+os.makedirs(CACHE_DIR, exist_ok=True)
 
+COOKIE_FILE = os.path.join(CACHE_DIR, "hisencookie.json")
 USER_AGENT = (
     "Mozilla/5.0 (iPhone; CPU iPhone OS 16_5 like Mac OS X) AppleWebKit/605.1.15 "
     "(KHTML, like Gecko) Mobile/15E148 MicroMessenger/8.0.31(0x18001e31) "

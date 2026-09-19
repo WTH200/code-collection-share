@@ -85,9 +85,11 @@ SIGN_URL = f"{HOST}/member/daily/sign"
 TENANT_ID = "1820778859526668290"
 # 网关域里嵌的是伊利矩阵主号 appid（wx621112590b635086），不是本店 appid，照源脚本保留
 GATEWAY_DOMAIN = "a1d5e5ea9-wx621112590b635086.sh.wxgateway.com"
+CACHE_DIR = os.environ.get("CODE_CACHE_DIR", os.path.join(os.path.expanduser("~"), "Documents", "写代码"))
 
-COOKIE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "yjlxhcookie.json")
+os.makedirs(CACHE_DIR, exist_ok=True)
 
+COOKIE_FILE = os.path.join(CACHE_DIR, "yjlxhcookie.json")
 USER_AGENT = (
     "Mozilla/5.0 (iPhone; CPU iPhone OS 18_4 like Mac OS X) AppleWebKit/605.1.15 "
     "(KHTML, like Gecko) Mobile/15E148 MicroMessenger/8.0.58(0x18003a35) "

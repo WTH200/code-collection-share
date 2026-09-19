@@ -102,9 +102,11 @@ CROP_TYPES = {1: "高粱", 2: "小麦"}
 
 # 浇水/施肥循环安全上限（源脚本为 while err==0 无限循环，由服务端终止）
 LOOP_MAX_TIMES = 50
+CACHE_DIR = os.environ.get("CODE_CACHE_DIR", os.path.join(os.path.expanduser("~"), "Documents", "写代码"))
 
-COOKIE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "xjxxcookie.json")
+os.makedirs(CACHE_DIR, exist_ok=True)
 
+COOKIE_FILE = os.path.join(CACHE_DIR, "xjxxcookie.json")
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36 "

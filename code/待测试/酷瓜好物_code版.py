@@ -85,9 +85,11 @@ LOGIN_URL = f"{BASE_URL}/login"  # ⚠️ 推断端点
 SIGN_POPUP_URL = f"{BASE_URL}/inflatedv3/popUpRedEnvelopes"
 RECEIVE_RED_ENVELOPES_URL = f"{BASE_URL}/inflatedv3/receiveRedEnvelopes"
 TASK_LIST_URL = f"{BASE_URL}/dailyTaskv2/index"
+CACHE_DIR = os.environ.get("CODE_CACHE_DIR", os.path.join(os.path.expanduser("~"), "Documents", "写代码"))
 
-COOKIE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "kuguacookie.json")
+os.makedirs(CACHE_DIR, exist_ok=True)
 
+COOKIE_FILE = os.path.join(CACHE_DIR, "kuguacookie.json")
 USER_AGENT = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36 MicroMessenger/6.8.0(0x16080000) "

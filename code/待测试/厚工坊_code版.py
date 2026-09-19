@@ -70,9 +70,11 @@ LOG_ICON = "🍶"
 BASE_URL = "https://api.hgf1862.com"
 LOGIN_URL = f"{BASE_URL}/YUN/api/onLogin.aspx"
 SIGN_URL = f"{BASE_URL}/YUN/Game/2021/QianDao/QianDaoAjax_By28.aspx"
+CACHE_DIR = os.environ.get("CODE_CACHE_DIR", os.path.join(os.path.expanduser("~"), "Documents", "写代码"))
 
-COOKIE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "hougongfangcookie.json")
+os.makedirs(CACHE_DIR, exist_ok=True)
 
+COOKIE_FILE = os.path.join(CACHE_DIR, "hougongfangcookie.json")
 USER_AGENT = (
     "Mozilla/5.0 (Linux; Android 12; M2012K11AC Build/SKQ1.220303.001; wv) AppleWebKit/537.36 (KHTML, like Gecko) "
     "Version/4.0 Chrome/134.0.6998.136 Mobile Safari/537.36 MicroMessenger/8.0.48.2580(0x28003036) MiniProgramEnv/android"

@@ -80,9 +80,11 @@ PLATFORM_KEY = "wxa587f7c3393d3d2f"
 LOGIN_VERSION = "V2.00.01"
 MINI_SCENE = "1089"
 FMY_VERSION = "1.0.00"
+CACHE_DIR = os.environ.get("CODE_CACHE_DIR", os.path.join(os.path.expanduser("~"), "Documents", "写代码"))
 
-COOKIE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "manniaocookie.json")
+os.makedirs(CACHE_DIR, exist_ok=True)
 
+COOKIE_FILE = os.path.join(CACHE_DIR, "manniaocookie.json")
 USER_AGENT = (
     "Mozilla/5.0 (iPhone; CPU iPhone OS 17_6_1 like Mac OS X) "
     "AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 "

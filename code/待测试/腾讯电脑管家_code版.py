@@ -94,9 +94,11 @@ SDIAID = os.getenv("QQPCMGR_SDIAID", "2025121115391911962")
 LOTTERY_ID = os.getenv("QQPCMGR_LID", "Lottery2")
 VERSION = os.getenv("QQPCMGR_VERSION", "18.2.30604.301")
 COMPUTER_NAME = os.getenv("QQPCMGR_COMPUTER", "smallfawn")
+CACHE_DIR = os.environ.get("CODE_CACHE_DIR", os.path.join(os.path.expanduser("~"), "Documents", "写代码"))
 
-COOKIE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "qqpcmgrcookie.json")
+os.makedirs(CACHE_DIR, exist_ok=True)
 
+COOKIE_FILE = os.path.join(CACHE_DIR, "qqpcmgrcookie.json")
 USER_AGENT = os.getenv(
     "QQPCMGR_UA",
     "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Safari/537.36 "

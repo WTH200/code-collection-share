@@ -91,9 +91,11 @@ DEFAULT_STORES = [
     {"name": "临水玉泉", "appId": "wx21293beab739d5c3", "kdtId": "44353481", "checkinId": "15129"},
     {"name": "TOI", "appId": "wxbb5a91aacbab57f2", "kdtId": "97827637", "checkinId": "2163238"},
 ]
+CACHE_DIR = os.environ.get("CODE_CACHE_DIR", os.path.join(os.path.expanduser("~"), "Documents", "写代码"))
 
-COOKIE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "yzcookie.json")
+os.makedirs(CACHE_DIR, exist_ok=True)
 
+COOKIE_FILE = os.path.join(CACHE_DIR, "yzcookie.json")
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36 "

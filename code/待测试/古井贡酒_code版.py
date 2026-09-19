@@ -95,9 +95,11 @@ LUCKY_LATITUDE = 32.310428619384766
 LUCKY_LONGITUDE = 118.34776306152344
 RED_LATITUDE = 32.3110466003418
 RED_LONGITUDE = 118.34707641601562
+CACHE_DIR = os.environ.get("CODE_CACHE_DIR", os.path.join(os.path.expanduser("~"), "Documents", "写代码"))
 
-COOKIE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "gujingcookie.json")
+os.makedirs(CACHE_DIR, exist_ok=True)
 
+COOKIE_FILE = os.path.join(CACHE_DIR, "gujingcookie.json")
 USER_AGENT = (
     "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4_1 like Mac OS X) AppleWebKit/605.1.15 "
     "(KHTML, like Gecko) Mobile/15E148 MicroMessenger/8.0.47(0x18002f2c) "

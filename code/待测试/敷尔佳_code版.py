@@ -81,9 +81,11 @@ CLIENT_SECRET = "1cdc05151d64f3a4a6ebd0e9de64422a"
 GRANT_TYPE = "yz_union"
 KDT_ID = "44980544"
 USER_VERSION = "2.220.5.101"
+CACHE_DIR = os.environ.get("CODE_CACHE_DIR", os.path.join(os.path.expanduser("~"), "Documents", "写代码"))
 
-COOKIE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fejcookie.json")
+os.makedirs(CACHE_DIR, exist_ok=True)
 
+COOKIE_FILE = os.path.join(CACHE_DIR, "fejcookie.json")
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) MicroMessenger/3.9.12 MiniProgramEnv/Windows "

@@ -78,9 +78,11 @@ ME_URL = f"{BASE_URL}/api/me"
 
 SIGN_ACTIVITY_ID = 25
 DRAW_ACTIVITY_ID = 42
+CACHE_DIR = os.environ.get("CODE_CACHE_DIR", os.path.join(os.path.expanduser("~"), "Documents", "写代码"))
 
-COOKIE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "instaxcookie.json")
+os.makedirs(CACHE_DIR, exist_ok=True)
 
+COOKIE_FILE = os.path.join(CACHE_DIR, "instaxcookie.json")
 USER_AGENT = (
     "Mozilla/5.0 (Linux; Android 13; V2148A Build/TP1A.220624.014; wv) "
     "AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/116.0.0.0 Mobile Safari/537.36 "

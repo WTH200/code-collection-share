@@ -84,9 +84,11 @@ SIGN_QUERY_URL = MAS_PROXY_BASE + "/api/cms_api/activity-center-im-service/im-sv
 API_KEY = "prod_secret123@muc"
 HMAC_KEY = "PROD_VnoClJI9aikS8dyy"
 REGIONSIGN = "0"  # 推断占位，真实值需抓包获取
+CACHE_DIR = os.environ.get("CODE_CACHE_DIR", os.path.join(os.path.expanduser("~"), "Documents", "写代码"))
 
-COOKIE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "mdmjcookie.json")
+os.makedirs(CACHE_DIR, exist_ok=True)
 
+COOKIE_FILE = os.path.join(CACHE_DIR, "mdmjcookie.json")
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36 "

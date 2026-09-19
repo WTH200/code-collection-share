@@ -106,9 +106,11 @@ APPS = [
     {"name": "乐旅商城", "key": "LLSC", "channelId": "1", "appId": "wx821fb4d8604ed4d6"},
     {"name": "驿路黔寻", "key": "YLQX", "channelId": "9", "appId": "wxee0ce83ab4b26f9c"},
 ]
+CACHE_DIR = os.environ.get("CODE_CACHE_DIR", os.path.join(os.path.expanduser("~"), "Documents", "写代码"))
 
-COOKIE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "huluwacookie.json")
+os.makedirs(CACHE_DIR, exist_ok=True)
 
+COOKIE_FILE = os.path.join(CACHE_DIR, "huluwacookie.json")
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
     "Chrome/107.0.0.0 Safari/537.36 MicroMessenger/7.0.20.1781(0x6700143B) NetType/WIFI "

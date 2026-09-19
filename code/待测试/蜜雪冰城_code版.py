@@ -81,9 +81,11 @@ REG_BY_UNIONID_URL = f"{API_BASE}/v1/app/regByUnionid"
 CUSTOMER_INFO_URL = f"{API_BASE}/v1/customer/info"
 SIGNIN_URL = f"{API_BASE}/v1/customer/signin"
 DUIBA_LOGIN_URL = f"{API_BASE}/v1/duiba/getLoginUrl"
+CACHE_DIR = os.environ.get("CODE_CACHE_DIR", os.path.join(os.path.expanduser("~"), "Documents", "写代码"))
 
-COOKIE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "mxbccookie.json")
+os.makedirs(CACHE_DIR, exist_ok=True)
 
+COOKIE_FILE = os.path.join(CACHE_DIR, "mxbccookie.json")
 PRIVATE_KEY_STR = """-----BEGIN PRIVATE KEY-----
 MIIEvwIBADANBgkqhkiG9w0BAQEFAASCBKkwggSlAgEAAoIBAQCtypUdHZJKlQ9L
 L6lIJSphnhqjke7HclgWuWDRWvzov30du235cCm13mqJ3zziqLCwstdQkuXo9sOP

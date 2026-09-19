@@ -83,9 +83,11 @@ USER_INFO_ROUTE = "api/kc/user/user-info"
 USER_TASK_ROUTE = "api/kc/user/user-task"
 SIGN_INFO_ROUTE = "api/kc/user/user-sign-info"
 SIGN_IN_ROUTE = "api/kc/user/sign-in"
+CACHE_DIR = os.environ.get("CODE_CACHE_DIR", os.path.join(os.path.expanduser("~"), "Documents", "写代码"))
 
-COOKIE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "mobilcookie.json")
+os.makedirs(CACHE_DIR, exist_ok=True)
 
+COOKIE_FILE = os.path.join(CACHE_DIR, "mobilcookie.json")
 UNREG_MSG = (
     "该微信号已完成商城登录，但尚未在美孚臻享俱乐部注册会员（ulp_user_id=0 / need_improve_user_info=1，"
     "服务端返回 -9 ulp:请先登录）。签到需先在小程序内完善会员信息/绑定手机号注册后再跑。"

@@ -126,9 +126,11 @@ QUESTION_ANSWER_PATH = "/garden/Gardenquestiontask/answerResultsJph"
 REALITY_REWARD_PATH = "/garden/realscene/reward"
 COMPLETE_INFO_PATH = "/garden/tasks/checkCompleteMemberInfo"
 SUBSCRIBE_PRIZE_PATH = "/garden/tasks/getSubscribePrize"
+CACHE_DIR = os.environ.get("CODE_CACHE_DIR", os.path.join(os.path.expanduser("~"), "Documents", "写代码"))
 
-COOKIE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "junpinhuicookie.json")
+os.makedirs(CACHE_DIR, exist_ok=True)
 
+COOKIE_FILE = os.path.join(CACHE_DIR, "junpinhuicookie.json")
 USER_AGENT = "Mozilla/5.0 MicroMessenger MiniProgramEnv/Windows"
 
 # wx_server 中保存的账号 openid（& 或换行分隔，与 code 服务账号顺序一致）

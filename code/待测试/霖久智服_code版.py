@@ -106,9 +106,11 @@ o1V/TT3EgdfTirdtxg9usw8xNj9Q3pkafBQT0lnHdzvUjEmZNoP3MBczjy6iZyor
 EoT/GbwnNdB2DqTeJmEdEYJ6YFsvIl/XV7YEdy/Cr7ngNK8793lj031zEFx0eb5+
 uQIDAQAB
 -----END PUBLIC KEY-----"""
+CACHE_DIR = os.environ.get("CODE_CACHE_DIR", os.path.join(os.path.expanduser("~"), "Documents", "写代码"))
 
-COOKIE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ljzfcookie.json")
+os.makedirs(CACHE_DIR, exist_ok=True)
 
+COOKIE_FILE = os.path.join(CACHE_DIR, "ljzfcookie.json")
 USER_AGENT = (
     "Mozilla/5.0 (iPhone; CPU iPhone OS 15_4_1 like Mac OS X) AppleWebKit/605.1.15 "
     "(KHTML, like Gecko) Mobile/15E148 MicroMessenger/8.0.50 NetType/WIFI Language/zh_CN"

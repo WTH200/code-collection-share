@@ -28,10 +28,11 @@ QYWX_TOKEN = __import__("os").getenv("QYWX_TOKEN", "")  # 企业微信机器人 
   2. /account-center/oauth/mini-app-login 使用 code 换 qm-user-token
      （企迈全站 AES-GCM 加密契约，同平台实测脚本验证）
   3. member/redirect 获取兑吧活动落地页地址（取 302 Set-Cookie 会话）
-  4. getToken 执行混淆 JS 动态计算签到 token（PyExecJS + 本机 JS 运行时）
-  5. doSign 每日签到
-  6. PushPlus / 企业微信推送
-  7. 品赞代理，业务请求优先代理，失败直连兜底
+  4. 从活动页解析 signOperatingId（活动 ID 会变，不能写死）
+  5. getToken 取混淆 JS，纯 Python 还原 window[k] 得到签到 token
+  6. doSign 签到 + signResult 轮询确认
+  7. PushPlus / 企业微信推送
+  8. 品赞代理，业务请求优先代理，失败直连兜底
 
 环境变量：
   PLUSPLUS_TOKEN    PushPlus token，可选
@@ -40,14 +41,13 @@ QYWX_TOKEN = __import__("os").getenv("QYWX_TOKEN", "")  # 企业微信机器人 
   PROXY_TYPE        http / socks5，默认 http
 
 依赖：
-  pip install requests pycryptodome PyExecJS
-  getToken 需执行混淆 JS，机器上要有可用 JS 运行时（如 node）
+  pip install requests pycryptodome
   socks5 代理需：
   pip install requests[socks]
 
-⚠️ 源脚本为抓包 qm-user-token 型（无登录调用），登录采用企迈平台
-   AES-GCM 加密登录契约（同平台 qmai 脚本实测通过）；源脚本 getToken 返回
-   混淆 JS 需 eval 执行取 window['620fa72t']，本版改用 PyExecJS 执行。
+⚠️ 签到 token 由兑吧 ctoken 接口下发混淆 JS，本脚本用内置纯 Python
+   解码器还原 eval 产物，无需 Node/execjs；signOperatingId 每次运行从
+   活动页动态解析，避免活动换 ID 后签到失效。
 """
 
 import base64
@@ -59,19 +59,496 @@ import time
 import traceback
 from datetime import datetime
 from typing import Any, Dict, List, Tuple
-from urllib.parse import quote
+from urllib.parse import quote, unquote, urlsplit
 
 import requests
 
+# pycryptodome 原生扩展在部分环境（如 musl aarch64）加载会失败，
+# 因此捕获 OSError 并回退到内置纯 Python AES-GCM 实现。
 try:
     from Crypto.Cipher import AES
-except ImportError:
+except Exception:
     AES = None
 
-try:
-    import execjs
-except ImportError:
-    execjs = None
+
+# ====================== 纯 Python AES-GCM 后备实现 ======================
+# 仅在 pycryptodome 不可用时使用，接口与 Crypto.Cipher.AES 的 GCM 用法对齐。
+AES_SBOX = bytes.fromhex(
+    "637c777bf26b6fc53001672bfed7ab76"
+    "ca82c97dfa5947f0add4a2af9ca472c0"
+    "b7fd9326363ff7cc34a5e5f171d83115"
+    "04c723c31896059a071280e2eb27b275"
+    "09832c1a1b6e5aa0523bd6b329e32f84"
+    "53d100ed20fcb15b6acbbe394a4c58cf"
+    "d0efaafb434d338545f9027f503c9fa8"
+    "51a3408f929d38f5bcb6da2110fff3d2"
+    "cd0c13ec5f974417c4a77e3d645d1973"
+    "60814fdc222a908846eeb814de5e0bdb"
+    "e0323a0a4906245cc2d3ac629195e479"
+    "e7c8376d8dd54ea96c56f4ea657aae08"
+    "ba78252e1ca6b4c6e8dd741f4bbd8b8a"
+    "703eb5664803f60e613557b986c11d9e"
+    "e1f8981169d98e949b1e87e9ce5528df"
+    "8ca1890dbfe6426841992d0fb054bb16"
+)
+AES_RCON = (0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1B, 0x36)
+
+
+def _aes_xtime(value: int) -> int:
+    value <<= 1
+    if value & 0x100:
+        value ^= 0x11B
+    return value & 0xFF
+
+
+def _aes_mul(a: int, b: int) -> int:
+    result = 0
+    while b:
+        if b & 1:
+            result ^= a
+        a = _aes_xtime(a)
+        b >>= 1
+    return result
+
+
+class PureAES:
+    """最小 AES 分组加密实现（支持 128/192/256 位密钥）。"""
+
+    def __init__(self, key: bytes):
+        self.key = bytes(key)
+        if len(self.key) not in (16, 24, 32):
+            raise ValueError("AES key must be 16, 24 or 32 bytes")
+        self.rounds = {16: 10, 24: 12, 32: 14}[len(self.key)]
+        self.round_keys = self._expand_key()
+
+    def _expand_key(self) -> List[bytes]:
+        key = self.key
+        nk = len(key) // 4
+        words = [list(key[4 * i:4 * i + 4]) for i in range(nk)]
+        for i in range(nk, 4 * (self.rounds + 1)):
+            temp = list(words[i - 1])
+            if i % nk == 0:
+                temp = temp[1:] + temp[:1]
+                temp = [AES_SBOX[b] for b in temp]
+                temp[0] ^= AES_RCON[i // nk - 1]
+            elif nk > 6 and i % nk == 4:
+                temp = [AES_SBOX[b] for b in temp]
+            words.append([words[i - nk][j] ^ temp[j] for j in range(4)])
+        return [
+            bytes(byte for word in words[4 * r:4 * r + 4] for byte in word)
+            for r in range(self.rounds + 1)
+        ]
+
+    def encrypt_block(self, block: bytes) -> bytes:
+        state = list(block)
+        self._add_round_key(state, 0)
+        for round_index in range(1, self.rounds):
+            self._sub_bytes(state)
+            self._shift_rows(state)
+            self._mix_columns(state)
+            self._add_round_key(state, round_index)
+        self._sub_bytes(state)
+        self._shift_rows(state)
+        self._add_round_key(state, self.rounds)
+        return bytes(state)
+
+    def _add_round_key(self, state, round_index: int) -> None:
+        round_key = self.round_keys[round_index]
+        for i in range(16):
+            state[i] ^= round_key[i]
+
+    @staticmethod
+    def _sub_bytes(state) -> None:
+        for i in range(16):
+            state[i] = AES_SBOX[state[i]]
+
+    @staticmethod
+    def _shift_rows(state) -> None:
+        # state 按列优先存储：index = row + 4 * column
+        for row in range(1, 4):
+            values = [state[row + 4 * column] for column in range(4)]
+            values = values[row:] + values[:row]
+            for column in range(4):
+                state[row + 4 * column] = values[column]
+
+    @staticmethod
+    def _mix_columns(state) -> None:
+        for column in range(4):
+            i = 4 * column
+            a0, a1, a2, a3 = state[i], state[i + 1], state[i + 2], state[i + 3]
+            state[i] = _aes_mul(a0, 2) ^ _aes_mul(a1, 3) ^ a2 ^ a3
+            state[i + 1] = a0 ^ _aes_mul(a1, 2) ^ _aes_mul(a2, 3) ^ a3
+            state[i + 2] = a0 ^ a1 ^ _aes_mul(a2, 2) ^ _aes_mul(a3, 3)
+            state[i + 3] = _aes_mul(a0, 3) ^ a1 ^ a2 ^ _aes_mul(a3, 2)
+
+
+def _aes_xor(left: bytes, right: bytes) -> bytes:
+    return bytes(a ^ b for a, b in zip(left, right))
+
+
+def _ghash_mul(x: bytes, y: bytes) -> bytes:
+    """GHASH 使用的 GF(2^128) 乘法（大端位序）。"""
+    z = 0
+    v = int.from_bytes(y, "big")
+    x_int = int.from_bytes(x, "big")
+    for i in range(128):
+        if (x_int >> (127 - i)) & 1:
+            z ^= v
+        if v & 1:
+            v = (v >> 1) ^ (0xE1 << 120)
+        else:
+            v >>= 1
+    return z.to_bytes(16, "big")
+
+
+def _ghash(hash_key: bytes, data: bytes) -> bytes:
+    y = b"\x00" * 16
+    for offset in range(0, len(data), 16):
+        block = data[offset:offset + 16]
+        if len(block) < 16:
+            block = block + b"\x00" * (16 - len(block))
+        y = _ghash_mul(_aes_xor(y, block), hash_key)
+    return y
+
+
+def _gcm_counter_block(j0: bytes, counter: int) -> bytes:
+    # GCM 用 inc32(J0) 作为第一个密钥流块
+    base = int.from_bytes(j0[12:], "big")
+    return j0[:12] + ((base + counter) & 0xFFFFFFFF).to_bytes(4, "big")
+
+
+def _gcm_crypt(cipher: PureAES, iv: bytes, data: bytes):
+    if len(iv) == 12:
+        j0 = iv + b"\x00\x00\x00\x01"
+    else:
+        padding = b"\x00" * ((16 - len(iv) % 16) % 16)
+        j0 = _ghash(
+            cipher.encrypt_block(b"\x00" * 16),
+            iv + padding + b"\x00" * 8 + (len(iv) * 8).to_bytes(8, "big"),
+        )
+
+    output = bytearray()
+    for index in range(0, len(data), 16):
+        keystream = cipher.encrypt_block(_gcm_counter_block(j0, index // 16 + 1))
+        output.extend(a ^ b for a, b in zip(data[index:index + 16], keystream))
+    return bytes(output), j0
+
+
+def _gcm_tag(cipher: PureAES, j0: bytes, ciphertext: bytes) -> bytes:
+    hash_key = cipher.encrypt_block(b"\x00" * 16)
+    payload = ciphertext + b"\x00" * ((16 - len(ciphertext) % 16) % 16)
+    payload += (0).to_bytes(8, "big") + (len(ciphertext) * 8).to_bytes(8, "big")
+    return _aes_xor(_ghash(hash_key, payload), cipher.encrypt_block(j0))
+
+
+def pure_gcm_encrypt(key: bytes, iv: bytes, plaintext: bytes) -> bytes:
+    """返回 ciphertext + 16 字节 tag。"""
+    cipher = PureAES(key)
+    ciphertext, j0 = _gcm_crypt(cipher, iv, plaintext)
+    return ciphertext + _gcm_tag(cipher, j0, ciphertext)
+
+
+def pure_gcm_decrypt(key: bytes, iv: bytes, data: bytes) -> bytes:
+    """校验 tag 并返回明文，校验失败抛 ValueError。"""
+    if len(data) < 16:
+        raise ValueError("ciphertext too short")
+    ciphertext, tag = data[:-16], data[-16:]
+    cipher = PureAES(key)
+    plaintext, j0 = _gcm_crypt(cipher, iv, ciphertext)
+    if _gcm_tag(cipher, j0, ciphertext) != tag:
+        raise ValueError("MAC check failed")
+    return plaintext
+
+
+# ====================== 兑吧 ctoken 混淆 JS 纯 Python 解码 ======================
+# /chw/ctoken/getToken 返回的 token 是一段混淆 JS，浏览器中 eval 后会写入一个
+# 固定键（抓包坐实为 '3fd0cbet'）供 /sign/component/doSign 使用。
+# 下面直接解释执行该 JS 里的数值表达式，不依赖 Node / execjs。
+CTOKEN_ALIAS_RE = re.compile(r"([A-Za-z_$][\w$]*)\s*=\s*String\s*\.\s*fromCharCode")
+CTOKEN_KEY_ARRAY_RE = re.compile(r"([A-Za-z_$][\w$]*)\s*=\s*\[([^\]]*)\]")
+CTOKEN_HELPER_RE = re.compile(
+    r"([A-Za-z_$][\w$]*)\s*=\s*function\s*\([^)]*\)\s*\{\s*return\s*"
+    r"arguments\s*\[\s*0\s*\]\s*\^\s*([A-Za-z_$][\w$]*)\s*\[\s*(\d+)\s*\]"
+)
+
+
+def _ctoken_strip_comments(code: str) -> str:
+    out, index, length = [], 0, len(code)
+    while index < length:
+        if code.startswith("/*", index):
+            end = code.find("*/", index + 2)
+            index = length if end == -1 else end + 2
+        elif code.startswith("//", index):
+            end = code.find("\n", index)
+            index = length if end == -1 else end
+        else:
+            out.append(code[index])
+            index += 1
+    return "".join(out)
+
+
+def _ctoken_normalize_name(name: str) -> str:
+    # 压缩器会输出 var__oOmDH=String.fromCharCode，正则捕获到的是 var__oOmDH
+    return name[3:] if name.startswith("var") else name
+
+
+class _CtokenExpressionParser:
+    """解释混淆 JS 中出现的整数表达式。"""
+
+    def __init__(self, text: str, helpers: Dict[str, Any]):
+        self.text = text
+        self.pos = 0
+        self.helpers = helpers
+
+    def parse(self) -> int:
+        value = self.parse_bit_or()
+        self.skip()
+        if self.pos != len(self.text):
+            raise ValueError(f"trailing input: {self.text[self.pos:self.pos + 40]!r}")
+        return value
+
+    def skip(self) -> None:
+        while self.pos < len(self.text) and self.text[self.pos] in " \t\r\n":
+            self.pos += 1
+
+    def parse_bit_or(self) -> int:
+        value = self.parse_xor()
+        while True:
+            self.skip()
+            if self.text.startswith("|", self.pos) and not self.text.startswith("||", self.pos):
+                self.pos += 1
+                value = int(value) | int(self.parse_xor())
+            else:
+                return value
+
+    def parse_xor(self) -> int:
+        value = self.parse_and()
+        while True:
+            self.skip()
+            if self.text.startswith("^", self.pos):
+                self.pos += 1
+                value = int(value) ^ int(self.parse_and())
+            else:
+                return value
+
+    def parse_and(self) -> int:
+        value = self.parse_shift()
+        while True:
+            self.skip()
+            if self.text.startswith("&", self.pos) and not self.text.startswith("&&", self.pos):
+                self.pos += 1
+                value = int(value) & int(self.parse_shift())
+            else:
+                return value
+
+    def parse_shift(self) -> int:
+        value = self.parse_additive()
+        while True:
+            self.skip()
+            if self.text.startswith(">>", self.pos):
+                self.pos += 2
+                value = int(value) >> int(self.parse_additive())
+            elif self.text.startswith("<<", self.pos):
+                self.pos += 2
+                value = int(value) << int(self.parse_additive())
+            else:
+                return value
+
+    def parse_additive(self) -> int:
+        value = self.parse_multiplicative()
+        while True:
+            self.skip()
+            if self.text.startswith("+", self.pos):
+                self.pos += 1
+                value = value + self.parse_multiplicative()
+            elif self.text.startswith("-", self.pos):
+                self.pos += 1
+                value = value - self.parse_multiplicative()
+            else:
+                return value
+
+    def parse_multiplicative(self) -> int:
+        value = self.parse_unary()
+        while True:
+            self.skip()
+            if self.text.startswith("*", self.pos):
+                self.pos += 1
+                value = value * self.parse_unary()
+            elif self.text.startswith("/", self.pos):
+                self.pos += 1
+                divisor = self.parse_unary()
+                value = int(value / divisor)
+            else:
+                return value
+
+    def parse_unary(self) -> int:
+        self.skip()
+        if self.text.startswith("~", self.pos):
+            self.pos += 1
+            return ~int(self.parse_unary())
+        if self.text.startswith("-", self.pos):
+            self.pos += 1
+            return -int(self.parse_unary())
+        if self.text.startswith("+", self.pos):
+            self.pos += 1
+            return int(self.parse_unary())
+        return self.parse_primary()
+
+    def parse_primary(self) -> int:
+        self.skip()
+        if self.text.startswith("(", self.pos):
+            self.pos += 1
+            value = self.parse_bit_or()
+            self.skip()
+            if not self.text.startswith(")", self.pos):
+                raise ValueError("missing )")
+            self.pos += 1
+            return value
+
+        name = self.read_name()
+        if name:
+            self.skip()
+            if name == "Math":
+                if not self.text.startswith(".", self.pos):
+                    raise ValueError("expected . after Math")
+                self.pos += 1
+                attribute = self.read_name()
+                if attribute != "abs":
+                    raise ValueError(f"unsupported Math.{attribute}")
+                return abs(int(self.parse_parenthesized()))
+            if name in self.helpers and self.text.startswith("(", self.pos):
+                return self.helpers[name](self.parse_parenthesized())
+            raise ValueError(f"unknown identifier {name}")
+
+        return self.read_number()
+
+    def parse_parenthesized(self) -> int:
+        self.skip()
+        if not self.text.startswith("(", self.pos):
+            raise ValueError("expected (")
+        self.pos += 1
+        value = self.parse_bit_or()
+        self.skip()
+        if not self.text.startswith(")", self.pos):
+            raise ValueError("missing )")
+        self.pos += 1
+        return value
+
+    def read_name(self) -> str:
+        self.skip()
+        match = re.match(r"[A-Za-z_$][\w$]*", self.text[self.pos:])
+        if not match:
+            return ""
+        self.pos += match.end()
+        return match.group(0)
+
+    def read_number(self) -> int:
+        self.skip()
+        match = re.match(r"0[xX][0-9a-fA-F]+|0[0-7]+|\d+", self.text[self.pos:])
+        if not match:
+            raise ValueError(f"unexpected char: {self.text[self.pos:self.pos + 30]!r}")
+        token = match.group(0)
+        self.pos += match.end()
+        if token.lower().startswith("0x"):
+            return int(token, 16)
+        if len(token) > 1 and token[0] == "0":
+            return int(token, 8)
+        return int(token)
+
+
+def _ctoken_split_top_level(text: str, separator: str) -> List[str]:
+    parts, buffer, depth = [], [], 0
+    for char in text:
+        if char == "(":
+            depth += 1
+        elif char == ")":
+            depth -= 1
+        if char == separator and depth == 0:
+            parts.append("".join(buffer))
+            buffer = []
+        else:
+            buffer.append(char)
+    parts.append("".join(buffer))
+    return parts
+
+
+def _ctoken_match_paren(text: str, start: int) -> int:
+    depth = 0
+    for index in range(start, len(text)):
+        if text[index] == "(":
+            depth += 1
+        elif text[index] == ")":
+            depth -= 1
+            if depth == 0:
+                return index
+    raise ValueError("unbalanced parentheses")
+
+
+def decode_ctoken_script(raw_js: str) -> str:
+    """还原混淆 JS 交给 eval 的字符串（内含 window['key']=value 赋值）。"""
+    code = _ctoken_strip_comments(re.sub(r"\\u([0-9a-fA-F]{4})", lambda m: chr(int(m.group(1), 16)), raw_js))
+
+    alias = ""
+    for match in CTOKEN_ALIAS_RE.finditer(code):
+        alias = _ctoken_normalize_name(match.group(1))
+    if not alias:
+        raise ValueError("fromCharCode alias not found")
+
+    keys: Dict[str, List[int]] = {}
+    for match in CTOKEN_KEY_ARRAY_RE.finditer(code):
+        values = [value.strip() for value in match.group(2).split(",") if value.strip()]
+        try:
+            keys[_ctoken_normalize_name(match.group(1))] = [int(value, 0) for value in values]
+        except ValueError:
+            continue
+
+    helpers: Dict[str, Any] = {}
+    for name, array_name, index in CTOKEN_HELPER_RE.findall(code):
+        name = _ctoken_normalize_name(name)
+        array_name = _ctoken_normalize_name(array_name)
+        if array_name in keys and int(index) < len(keys[array_name]):
+            key = keys[array_name][int(index)]
+            helpers[name] = (lambda key_value: (lambda value: int(value) ^ key_value))(key)
+
+    eval_index = code.find("eval(")
+    if eval_index == -1:
+        raise ValueError("eval( not found")
+    open_paren = eval_index + len("eval")
+    payload = code[open_paren + 1:_ctoken_match_paren(code, open_paren)]
+
+    chunks: List[str] = []
+    for piece in _ctoken_split_top_level(payload, "+"):
+        piece = piece.strip()
+        call = re.search(r"([A-Za-z_$][\w$]*)\s*\(", piece)
+        if not call or call.group(1) != alias:
+            continue
+        inner = piece[call.end():]
+        arguments = inner[:_ctoken_match_paren("(" + inner, 0) - 1]
+        for argument in _ctoken_split_top_level(arguments, ","):
+            argument = argument.strip()
+            if argument:
+                chunks.append(chr(int(_CtokenExpressionParser(argument, helpers).parse()) & 0xFFFF))
+
+    return "".join(chunks)
+
+
+def extract_ctoken_value(eval_script: str) -> str:
+    """从 eval 产物中取出前端固定使用的那个 window 键值。
+
+    键名形如 '3fd0cbet'（字母数字混合，不一定是十六进制），因此这里用
+    宽松字符集匹配；优先取页面声明的键，否则退回初始项。
+    """
+    assignments = re.findall(
+        r"window\[['\"]([0-9A-Za-z]{4,16})['\"]\]\s*=\s*['\"]([^'\"]*)['\"]",
+        eval_script,
+    )
+    if not assignments:
+        raise ValueError("no window assignment found")
+    for key, value in assignments:
+        if key.lower() == SIGN_TOKEN_KEY.lower():
+            return value
+    raise ValueError(f"window key {SIGN_TOKEN_KEY} not found in ctoken payload")
+
 
 
 APP_NAME = "益禾堂小程序"
@@ -101,16 +578,26 @@ QMAI_REDIRECT_URL = f"{QMAI_BASE_URL}/catering/crm/member/redirect"
 ACTIVITY_PAGE_URL = "https://86019.activity-12.m.duiba.com.cn/chw/visual-editor/skins?id=203576"
 ACTIVITY_TOKEN_URL = "https://86019-activity.dexfu.cn/chw/ctoken/getToken"
 ACTIVITY_SIGN_URL = "https://86019-activity.dexfu.cn/sign/component/doSign"
-SIGN_OPERATING_ID = "326649747164581"
+ACTIVITY_SIGN_PAGE_URL = "https://86019-activity.dexfu.cn/sign/component/page"
+ACTIVITY_SIGN_INDEX_URL = "https://86019-activity.dexfu.cn/sign/component/index"
+ACTIVITY_SIGN_RESULT_URL = "https://86019-activity.dexfu.cn/sign/component/signResult"
+ACTIVITY_ORIGIN = "https://86019-activity.dexfu.cn"
+
+# 活动 ID 会随活动变更，仅当页面解析失败时用作兜底
+SIGN_OPERATING_ID_FALLBACK = "340158783207556"
+# 兑吧页面脚本中使用的 window 键名（抓包坐实）
+SIGN_TOKEN_KEY = "3fd0cbet"
 STORE_ID = "203009"
 
 # —— 企迈全站 AES-GCM 加密固定参数（源自解包 requestEncryptSdk，同平台脚本验证）——
 KEY_RAW = "mN6KpXq8Sv2WxYz9LdFcRgHjMnBvCtDxZaS3QwE5rT0yU7I4O1A"
 KEY_VERSION = "1.0.0"
 META_HEADER = "QM-Encrypt-Meta"
+CACHE_DIR = os.environ.get("CODE_CACHE_DIR", os.path.join(os.path.expanduser("~"), "Documents", "写代码"))
 
-COOKIE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "yhtcookie.json")
+os.makedirs(CACHE_DIR, exist_ok=True)
 
+COOKIE_FILE = os.path.join(CACHE_DIR, "yhtcookie.json")
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36 "
@@ -442,17 +929,20 @@ def derive_key(raw: str) -> bytes:
 
 def gcm_encrypt(plaintext: str, iv: bytes) -> str:
     """AES-256-GCM：返回 base64(ciphertext + 16字节tag)。"""
-    cipher = AES.new(KEY, AES.MODE_GCM, nonce=iv)
-    enc, tag = cipher.encrypt_and_digest(plaintext.encode("utf-8"))
-    return base64.b64encode(enc + tag).decode("utf-8")
+    raw = plaintext.encode("utf-8")
+    if AES is not None:
+        cipher = AES.new(KEY, AES.MODE_GCM, nonce=iv)
+        enc, tag = cipher.encrypt_and_digest(raw)
+        return base64.b64encode(enc + tag).decode("utf-8")
+    return base64.b64encode(pure_gcm_encrypt(KEY, iv, raw)).decode("utf-8")
 
 
 def gcm_decrypt(payload_b64: str, iv: bytes) -> str:
     buf = base64.b64decode(payload_b64)
-    tag = buf[-16:]
-    data = buf[:-16]
-    cipher = AES.new(KEY, AES.MODE_GCM, nonce=iv)
-    return cipher.decrypt_and_verify(data, tag).decode("utf-8")
+    if AES is not None:
+        cipher = AES.new(KEY, AES.MODE_GCM, nonce=iv)
+        return cipher.decrypt_and_verify(buf[:-16], buf[-16:]).decode("utf-8")
+    return pure_gcm_decrypt(KEY, iv, buf).decode("utf-8")
 
 
 KEY = derive_key(KEY_RAW)
@@ -468,8 +958,7 @@ def qmai_request(
     server: str = "",
 ) -> Dict[str, Any]:
     """企迈加密请求：AES-GCM 请求体 + QM-Encrypt-Meta 头，响应加密时自动解密。"""
-    if AES is None:
-        return {"status": False, "code": -1, "message": "缺少 pycryptodome，请先 pip install pycryptodome"}
+    # AES 不可用时自动使用内置纯 Python AES-GCM（已对拍 pycryptodome）
 
     payload_obj = dict(body or {})
     if not payload_obj.get("appid"):
@@ -753,14 +1242,75 @@ def fetch_activity_cookie(server: str, activity_url: str, proxies: Dict[str, str
         return ""
 
 
-def get_activity_key(server: str, session_cookie: str, proxies: Dict[str, str] | None) -> str:
-    """getToken：返回混淆 JS，执行后取 window['3fd0cbet']（HAR 抓包坐实的固定键）
+def _activity_id_candidates(activity_url: str) -> List[str]:
+    """列出可能内嵌 signOperatingId 的页面（活动换 ID 时无需改脚本）。"""
+    candidates: List[str] = []
 
-    逆向结论（ProxyPin 抓包 + Node 执行验证）：
-      · 服务端返回的混淆 JS 会在浏览器里 eval 出一串 window[k]=v 赋值
-      · 其中固定键 window['3fd0cbet'] 的值就是 doSign 需要的 token
-      · 该键在多次请求中稳定不变（实测两次均为同一键名）
-      · 优先用 execjs/Node 执行；若不可用，则退化用正则从 eval 产物里提取
+    # autologin 链接里的 redirect 参数指向活动页，例如
+    #   /chw/visual-editor/skins?id=203576
+    match = re.search(r"[?&]redirect=([^&]+)", activity_url or "")
+    if match:
+        target = unquote(match.group(1))
+        candidates.append(target)
+        split = urlsplit(target)
+        if split.path:
+            suffix = f"{split.path}?{split.query}" if split.query else split.path
+            candidates.append(f"{ACTIVITY_ORIGIN}{suffix}")
+
+    candidates.append(ACTIVITY_PAGE_URL)
+    candidates.append(f"{ACTIVITY_SIGN_PAGE_URL}?preview=false")
+
+    ordered: List[str] = []
+    for url in candidates:
+        if url and url not in ordered:
+            ordered.append(url)
+    return ordered
+
+
+def resolve_sign_operating_id(
+    server: str,
+    session_cookie: str,
+    activity_url: str,
+    proxies: Dict[str, str] | None,
+) -> str:
+    """从活动页解析当次活动的 signOperatingId。"""
+    for page_url in _activity_id_candidates(activity_url):
+        try:
+            response = request_with_proxy(
+                "GET",
+                page_url,
+                headers={
+                    "User-Agent": SIGN_USER_AGENT,
+                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                    "Cookie": session_cookie,
+                },
+                proxies=proxies,
+                server=server,
+            )
+            matches = re.findall(r"signOperatingId[=\"':\s]+?(\d{6,})", response.text or "")
+            if matches:
+                print(f"🎯 [签到] 活动 ID: {matches[0]}")
+                return matches[0]
+        except Exception as exc:
+            print(f"⚠️ [签到] 解析活动 ID 异常: {str(exc)[:120]}")
+
+    print(f"⚠️ [签到] 未能解析活动 ID，回退默认值 {SIGN_OPERATING_ID_FALLBACK}")
+    return SIGN_OPERATING_ID_FALLBACK
+
+
+def get_activity_key(
+    server: str,
+    session_cookie: str,
+    sign_operating_id: str,
+    proxies: Dict[str, str] | None,
+) -> str:
+    """getToken：取混淆 JS，用内置纯 Python 解码器还原出签到 token。
+
+    逆向结论（ProxyPin 抓包 + Node 对照验证）：
+      · 签到页内联脚本定义 window.getDuibaToken，它会 POST /chw/ctoken/getToken
+      · 响应里的 token 字段是混淆 JS，eval 后写入 window['3fd0cbet']
+      · 前端把这个值作为 token 字段随 doSign 一起提交
+      · 解码全程可在 Python 内完成，无需 Node / execjs
     """
     ts = int(time.time() * 1000)
     try:
@@ -771,8 +1321,8 @@ def get_activity_key(server: str, session_cookie: str, proxies: Dict[str, str] |
                 "User-Agent": SIGN_USER_AGENT,
                 "Accept": "application/json, text/plain, */*",
                 "Content-Type": "application/x-www-form-urlencoded",
-                "Origin": "https://86019-activity.dexfu.cn",
-                "Referer": f"https://86019-activity.dexfu.cn/sign/component/page?signOperatingId={SIGN_OPERATING_ID}",
+                "Origin": ACTIVITY_ORIGIN,
+                "Referer": f"{ACTIVITY_SIGN_PAGE_URL}?signOperatingId={sign_operating_id}",
                 "Cookie": session_cookie,
             },
             data={"timestamp": ts},
@@ -780,40 +1330,72 @@ def get_activity_key(server: str, session_cookie: str, proxies: Dict[str, str] |
             server=server,
         )
         result = response.json()
+        try:
+            result = response.json()
+        except Exception:
+            print(f"❌ [签到] getToken 返回非 JSON（会话可能已过期）: {response.text[:150]}")
+            return ""
         if not result.get("success"):
             print(f"❌ [签到] getToken 失败: {json_preview(result, 300)}")
             return ""
         raw_js = str(result.get("token") or "")
+        if not raw_js:
+            print(f"❌ [签到] getToken 未返回 token 字段: {json_preview(result, 200)}")
+            return ""
     except Exception as exc:
         print(f"❌ [签到] getToken 异常: {exc}")
         return ""
 
-    # Node/execjs 执行（修掉旧式八进制字面量后再 eval）
-    if execjs is not None:
+    try:
+        eval_script = decode_ctoken_script(raw_js)
+        key = extract_ctoken_value(eval_script)
+    except Exception as exc:
+        print(f"❌ [签到] 无法从 getToken 响应解析 token: {exc}")
+        return ""
+
+    print("✅ [签到] 获取签到 token 成功")
+    return key
+
+
+def poll_sign_result(
+    server: str,
+    session_cookie: str,
+    order_num: str,
+    proxies: Dict[str, str] | None,
+    retry: int = 5,
+) -> int | None:
+    """轮询 signResult 拿实际发放积分（doSign 只返回状态码）。"""
+    for _ in range(retry):
         try:
-            fixed_code = re.sub(r"\b0([0-7]+)\b", r"0o\1", raw_js)
-            context = execjs.compile("var window = {};\n" + fixed_code)
-            key = context.eval("window['3fd0cbet']")
-            if key:
-                print("✅ [签到] 获取签到 token 成功")
-                return str(key)
+            response = request_with_proxy(
+                "GET",
+                f"{ACTIVITY_SIGN_RESULT_URL}?orderNum={order_num}&_={int(time.time() * 1000)}",
+                headers={
+                    "User-Agent": SIGN_USER_AGENT,
+                    "Accept": "application/json, text/plain, */*",
+                    "Origin": ACTIVITY_ORIGIN,
+                    "Referer": ACTIVITY_SIGN_PAGE_URL,
+                    "Cookie": session_cookie,
+                },
+                proxies=proxies,
+                server=server,
+            )
+            payload = response.json()
+            data = payload.get("data") or {}
+            sign_result = data.get("signResult")
+
+            # 1 = 处理中，继续轮询；2 = 已出结果，credits 为发放积分
+            if sign_result == 1:
+                sleep(1.5)
+                continue
+            if sign_result == 2:
+                return int(to_float(data.get("credits")))
+            return None
         except Exception as exc:
-            print(f"⚠️ [签到] JS 执行失败，改用正则提取: {str(exc)[:80]}")
+            print(f"⚠️ [签到] 查询签到结果异常: {str(exc)[:120]}")
+            sleep(1.5)
 
-    # 兜底：直接从 eval 产物里正则提取固定键
-    m = re.search(r"window\[['\"]3fd0cbet['\"]\]\s*=\s*['\"]([^'\"]+)['\"]", raw_js)
-    if not m:
-        # 再兜底：先解出 eval 字符串再匹配
-        m2 = re.search(r"window\[['\"]([0-9a-f]{6,10})['\"]\]\s*=\s*['\"]([^'\"]+)['\"]", raw_js)
-        if m2:
-            print("⚠️ [签到] 未找到 3fd0cbet 键，取首个候选项")
-            return m2.group(2)
-    if m:
-        print("✅ [签到] 获取签到 token 成功（正则）")
-        return m.group(1)
-
-    print("❌ [签到] 无法从 getToken 响应解析 token")
-    return ""
+    return None
 
 
 def run_account(index: int, total: int, server: str) -> Dict[str, Any]:
@@ -867,18 +1449,21 @@ def run_account(index: int, total: int, server: str) -> Dict[str, Any]:
 
         sleep(random.uniform(1.0, 2.0))
 
-        # 3. getToken 动态计算签到 token
-        key = get_activity_key(server, session_cookie, proxies)
+        # 3. 从活动页解析当次活动的 signOperatingId
+        sign_operating_id = resolve_sign_operating_id(server, session_cookie, activity_url, proxies)
+
+        sleep(random.uniform(1.0, 2.0))
+
+        # 4. getToken 取混淆 JS，用内置解码器还原签到 token
+        key = get_activity_key(server, session_cookie, sign_operating_id, proxies)
         if not key:
-            result["error"] = ("getToken 失败：该签到 token 由兑吧反爬组件在浏览器上下文生成"
-                           "（键名随机、依赖浏览器指纹），纯脚本无法复现；"
-                           "请改用带浏览器的方案或直接在小程序内签到")
+            result["error"] = "getToken 失败：无法还原兑吧下发的签到 token"
             print(f"❌ [签到] {result['error']}")
             return result
 
         sleep(random.uniform(1.0, 2.0))
 
-        # 4. doSign 签到
+        # 5. doSign 签到
         sign_resp = request_with_proxy(
             "POST",
             f"{ACTIVITY_SIGN_URL}?_={int(time.time() * 1000)}",
@@ -886,13 +1471,13 @@ def run_account(index: int, total: int, server: str) -> Dict[str, Any]:
                 "User-Agent": SIGN_USER_AGENT,
                 "Accept": "application/json, text/plain, */*",
                 "Content-Type": "application/x-www-form-urlencoded",
-                "Origin": "https://86019-activity.dexfu.cn",
-                "Referer": f"https://86019-activity.dexfu.cn/sign/component/page?signOperatingId={SIGN_OPERATING_ID}",
+                "Origin": ACTIVITY_ORIGIN,
+                "Referer": f"{ACTIVITY_SIGN_PAGE_URL}?signOperatingId={sign_operating_id}",
                 "accept-language": "zh-CN,zh;q=0.9",
                 "Cookie": session_cookie,
             },
             data={
-                "signOperatingId": SIGN_OPERATING_ID,
+                "signOperatingId": sign_operating_id,
                 "token": key,
             },
             proxies=proxies,
@@ -904,11 +1489,18 @@ def run_account(index: int, total: int, server: str) -> Dict[str, Any]:
             sign_json = {"success": False, "data": sign_resp.text[:300]}
 
         if sign_json.get("success") is True:
-            sign_data = sign_json.get("data")
-            if isinstance(sign_data, dict) and sign_data.get("signResult") not in (None, ""):
-                result["signMsg"] = f"签到成功，获得{sign_data['signResult']}积分"
-            elif sign_data:
-                result["signMsg"] = f"签到成功: {json_preview(sign_data, 200)}"
+            sign_data = sign_json.get("data") or {}
+            order_num = sign_data.get("orderNum") if isinstance(sign_data, dict) else None
+
+            # doSign 返回的 signResult 是状态码（100=待轮询），实际积分要从 signResult 接口取
+            credits = None
+            if order_num:
+                credits = poll_sign_result(server, session_cookie, str(order_num), proxies)
+
+            if credits is not None:
+                result["signMsg"] = f"签到成功，获得{credits}积分"
+            elif isinstance(sign_data, dict) and sign_data.get("errorMsg"):
+                result["signMsg"] = f"签到成功: {sign_data['errorMsg']}"
             else:
                 result["signMsg"] = "签到成功"
             print(f"✅ [签到] {result['signMsg']}")
@@ -921,7 +1513,7 @@ def run_account(index: int, total: int, server: str) -> Dict[str, Any]:
                 result["signMsg"] = f"签到失败: {preview}"
                 print(f"❌ [签到] {result['signMsg']}")
 
-        result["success"] = True
+        result["success"] = "失败" not in str(result["signMsg"])
         return result
 
     except Exception as exc:

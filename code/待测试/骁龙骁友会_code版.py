@@ -79,9 +79,11 @@ READ_SECONDS = 300
 VLOG_SECONDS = 60
 VLOG_SWITCH_KEY = "task_switch_DAILY_PLAY_VIDEO_1_MINUTES"
 READ_TASK = os.getenv("WX_XLXYH_READ_TASK", "1").lower() not in ("0", "false", "no", "off")
+CACHE_DIR = os.environ.get("CODE_CACHE_DIR", os.path.join(os.path.expanduser("~"), "Documents", "写代码"))
 
-COOKIE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "xlxyhcookie.json")
+os.makedirs(CACHE_DIR, exist_ok=True)
 
+COOKIE_FILE = os.path.join(CACHE_DIR, "xlxyhcookie.json")
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36 "
     "MicroMessenger/7.0.20.1781(0x6700143B) NetType/WIFI MiniProgramEnv/Windows WindowsWechat/WMPF "

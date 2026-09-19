@@ -81,9 +81,11 @@ LOGIN_CANDIDATE_URLS = [
     f"{BASE_URL}/xqw/user_mall.php?act=login&code={{code}}",
     f"{BASE_URL}/xqw/login.php?act=wxlogin&code={{code}}",
 ]
+CACHE_DIR = os.environ.get("CODE_CACHE_DIR", os.path.join(os.path.expanduser("~"), "Documents", "写代码"))
 
-COOKIE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "taosecookie.json")
+os.makedirs(CACHE_DIR, exist_ok=True)
 
+COOKIE_FILE = os.path.join(CACHE_DIR, "taosecookie.json")
 USER_AGENT = (
     "Mozilla/5.0 (Linux; Android 13; 23054RA19C Build/TP1A.220624.014; wv) "
     "AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/116.0.0.0 Mobile "

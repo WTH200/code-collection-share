@@ -89,9 +89,11 @@ AD_ID = "adunit-9827a6d4b25ac116"
 WATCH_AD_TIMES = int(os.getenv("YZG_WATCH_TIMES", "15") or "15")
 WATCH_AD_INTERVAL = 35
 WITHDRAW_ENABLED = os.getenv("YZG_TIXIAN", "False") == "True"
+CACHE_DIR = os.environ.get("CODE_CACHE_DIR", os.path.join(os.path.expanduser("~"), "Documents", "写代码"))
 
-COOKIE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "yzgjcookie.json")
+os.makedirs(CACHE_DIR, exist_ok=True)
 
+COOKIE_FILE = os.path.join(CACHE_DIR, "yzgjcookie.json")
 USER_AGENT = (
     "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5_1 like Mac OS X) AppleWebKit/605.1.15 "
     "(KHTML, like Gecko) Mobile/15E148 MicroMessenger/8.0.49(0x18003135) NetType/WIFI Language/zh_CN"

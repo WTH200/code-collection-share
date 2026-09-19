@@ -131,9 +131,11 @@ APPS = [
     {"ck": "zbbbwl", "name": "重百宝贝王乐园", "appid": "wx9dc5d73cb2d62bdc", "templateVersion": "game_2.30.4"},
     {"ck": "zjmxwt", "name": "终极梦想沃特", "appid": "wx733a59c79a4bb702", "templateVersion": "game_2.31.0"},
 ]
+CACHE_DIR = os.environ.get("CODE_CACHE_DIR", os.path.join(os.path.expanduser("~"), "Documents", "写代码"))
 
-COOKIE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ykballcookie.json")
+os.makedirs(CACHE_DIR, exist_ok=True)
 
+COOKIE_FILE = os.path.join(CACHE_DIR, "ykballcookie.json")
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) MicroMessenger/3.9.12 "
     "MiniProgramEnv/Windows WindowsWechat/WMPF"

@@ -77,9 +77,11 @@ SIGN_URL = f"{BASE_URL}/activity/wxapp/signin/signin"
 FRAGMENT_URL = f"{BASE_URL}/activity/wxapp/signin/queryFragment"
 MEMBER_INFO_URL = f"{BASE_URL}/activity/wxapp/applet/queryMemberCacheInfo"
 GROWTH_INFO_URL = f"{BASE_URL}/activity/wxapp/applet/queryGrowthInfo"
+CACHE_DIR = os.environ.get("CODE_CACHE_DIR", os.path.join(os.path.expanduser("~"), "Documents", "写代码"))
 
-COOKIE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "hdlcookie.json")
+os.makedirs(CACHE_DIR, exist_ok=True)
 
+COOKIE_FILE = os.path.join(CACHE_DIR, "hdlcookie.json")
 USER_AGENT = (
     "MicroMessenger/7.0.20.1781(0x6700143B) NetType/WIFI MiniProgramEnv/Windows "
     "WindowsWechat/WMPF WindowsWechat(0x63090a13) UnifiedPCWindowsWechat(0xf254032b) XWEB/13655"

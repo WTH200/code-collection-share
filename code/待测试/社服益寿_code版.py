@@ -87,9 +87,11 @@ BASE_URL = "https://ylapi.luckystarpay.com"
 LOGIN_URL = f"{BASE_URL}/api/silenceLogin"
 USER_URL = f"{BASE_URL}/api/getUserInfo"
 SIGN_URL = f"{BASE_URL}/api/userSign"
+CACHE_DIR = os.environ.get("CODE_CACHE_DIR", os.path.join(os.path.expanduser("~"), "Documents", "写代码"))
 
-COOKIE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sfyshcookie.json")
+os.makedirs(CACHE_DIR, exist_ok=True)
 
+COOKIE_FILE = os.path.join(CACHE_DIR, "sfyshcookie.json")
 USER_AGENT = (
     "Mozilla/5.0 (Linux; Android 12; M2012K11AC Build/SKQ1.220303.001; wv) AppleWebKit/537.36 (KHTML, like Gecko) "
     "Version/4.0 Chrome/134.0.6998.136 Mobile Safari/537.36 MicroMessenger/8.0.48.2580(0x28003036) MiniProgramEnv/android"

@@ -78,9 +78,11 @@ LOGIN_URL = f"{BASE_URL}/tools/user.ashx?action=login"
 USER_INFO_URL = f"{BASE_URL}/tools/user.ashx?action=get_user_info"
 SIGN_URL = f"{BASE_URL}/tools/user.ashx?action=sign"
 FLOW_LIST_URL = f"{BASE_URL}/tools/submit_ajax.ashx?action=get_user_flow_list"
+CACHE_DIR = os.environ.get("CODE_CACHE_DIR", os.path.join(os.path.expanduser("~"), "Documents", "写代码"))
 
-COOKIE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "hhbwgcookie.json")
+os.makedirs(CACHE_DIR, exist_ok=True)
 
+COOKIE_FILE = os.path.join(CACHE_DIR, "hhbwgcookie.json")
 USER_AGENT = (
     "Mozilla/5.0 (iPhone; CPU iPhone OS 17_3_1 like Mac OS X) AppleWebKit/605.1.15 "
     "(KHTML, like Gecko) Mobile/15E148 MicroMessenger/8.0.48(0x1800302c) "

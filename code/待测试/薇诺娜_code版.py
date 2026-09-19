@@ -81,9 +81,11 @@ BASE_URL = "https://api.qiumeiapp.com/zg-activity/zg-daily/"
 USER_INFO_URL = "https://api.qiumeiapp.com/zgxcx/10001/getZgUserInfo"
 
 SHARE_CODE = "48d96b20"  # 照源脚本内置助力码
+CACHE_DIR = os.environ.get("CODE_CACHE_DIR", os.path.join(os.path.expanduser("~"), "Documents", "写代码"))
 
-COOKIE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "wnncookie.json")
+os.makedirs(CACHE_DIR, exist_ok=True)
 
+COOKIE_FILE = os.path.join(CACHE_DIR, "wnncookie.json")
 USER_AGENT = (
     "Mozilla/5.0 (iPhone; CPU iPhone OS 17_6_1 like Mac OS X) "
     "AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 "

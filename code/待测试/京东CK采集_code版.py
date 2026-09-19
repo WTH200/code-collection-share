@@ -76,9 +76,11 @@ REQUEST_TIMEOUT = 30
 PAGE_VERSION = "873"
 LOGIN_URL = "https://wq.jd.com/mlogin/wxapp/login_lt"
 JD_USER_INFO_URL = "https://me-api.jd.com/user_new/info/GetJDUserInfoUnion"  # 补充的只读缓存验证接口
+CACHE_DIR = os.environ.get("CODE_CACHE_DIR", os.path.join(os.path.expanduser("~"), "Documents", "写代码"))
 
-COOKIE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "jdcodecookie.json")
+os.makedirs(CACHE_DIR, exist_ok=True)
 
+COOKIE_FILE = os.path.join(CACHE_DIR, "jdcodecookie.json")
 USER_AGENT = (
     "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) "
     "Mobile/15E148 MicroMessenger/8.0.49 NetType/WIFI Language/zh_CN miniProgram/" + APPID

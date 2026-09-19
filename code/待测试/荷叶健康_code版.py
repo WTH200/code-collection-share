@@ -98,9 +98,11 @@ COLLECT_WATER_URL = f"{BASE_URL}/api/healthSquare/water/collectWater"
 GO_FRUIT_GARDEN_URL = f"{BASE_URL}/healthSquare/herbalGarden/goFruitOrGarden"
 
 CHANNEL_CODE = os.getenv("HYJK_CHANNEL_CODE", "130")
+CACHE_DIR = os.environ.get("CODE_CACHE_DIR", os.path.join(os.path.expanduser("~"), "Documents", "写代码"))
 
-COOKIE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "hyjkcookie.json")
+os.makedirs(CACHE_DIR, exist_ok=True)
 
+COOKIE_FILE = os.path.join(CACHE_DIR, "hyjkcookie.json")
 USER_AGENT = (
     "Mozilla/5.0 (iPhone; CPU iPhone OS 16_7_15 like Mac OS X) AppleWebKit/605.1.15 "
     "(KHTML, like Gecko) Mobile/15E148 MicroMessenger/8.0.70(0x18004630) NetType/WIFI "

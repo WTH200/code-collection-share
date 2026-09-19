@@ -104,9 +104,11 @@ SIGN_STATUS_URL = f"{POINT_BASE}/AIoTPointsMall/gw/svc/HiVip/1.0/getCheckInStatu
 SIGN_IN_URL = f"{POINT_BASE}/AIoTPointsMall/gw/svc/HiVip/1.0/checkIn"
 REFRESH_TOKEN_URL = f"{MINI_MOBI_BASE}/MobileMiniAppAPI/1.2/adapter/refreshToken"
 PHONE_LOGIN_URL = f"{WXTV_BASE}/weixintv/oauth/login4MiniAPPByPhone"
+CACHE_DIR = os.environ.get("CODE_CACHE_DIR", os.path.join(os.path.expanduser("~"), "Documents", "写代码"))
 
-COOKIE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "hxajcookie.json")
+os.makedirs(CACHE_DIR, exist_ok=True)
 
+COOKIE_FILE = os.path.join(CACHE_DIR, "hxajcookie.json")
 USER_AGENT = "Mozilla/5.0 MicroMessenger MiniProgramEnv/Windows"
 
 

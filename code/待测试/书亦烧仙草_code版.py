@@ -88,9 +88,11 @@ OCR_URL = "http://ocr.onecc.cc/slide/match/b64/json"
 
 CLIENT_UID = "slider-f55cf63d-2806-460a-a57f-5d0d7b56a0c0"
 AES_BLOCK_SIZE = 16
+CACHE_DIR = os.environ.get("CODE_CACHE_DIR", os.path.join(os.path.expanduser("~"), "Documents", "写代码"))
 
-COOKIE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sysxcookie.json")
+os.makedirs(CACHE_DIR, exist_ok=True)
 
+COOKIE_FILE = os.path.join(CACHE_DIR, "sysxcookie.json")
 USER_AGENT = (
     "Mozilla/5.0 (Linux; Android 10; MI 8 Lite Build/QKQ1.190910.002; wv) "
     "AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/107.0.5304.141 "

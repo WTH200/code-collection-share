@@ -85,9 +85,11 @@ OAUTH_URL_TEMPLATE = OAUTH_BASE + "/{account_id}/v2/weapp/oauth"
 SIGN_PAGE_URL = f"{CONSUMER_BASE}/modules/campaigncenter/signin/page"
 SIGN_STATS_URL = f"{CONSUMER_BASE}/modules/campaigncenter/signin/stats"
 SIGN_TAKE_URL = f"{CONSUMER_BASE}/modules/campaigncenter/signin"
+CACHE_DIR = os.environ.get("CODE_CACHE_DIR", os.path.join(os.path.expanduser("~"), "Documents", "写代码"))
 
-COOKIE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "quncrmcookie.json")
+os.makedirs(CACHE_DIR, exist_ok=True)
 
+COOKIE_FILE = os.path.join(CACHE_DIR, "quncrmcookie.json")
 USER_AGENT = (
     "Mozilla/5.0 (Linux; Android 12; M2012K11AC Build/SKQ1.220303.001; wv) AppleWebKit/537.36 (KHTML, like Gecko) "
     "Version/4.0 Chrome/134.0.6998.136 Mobile Safari/537.36 MicroMessenger/8.0.48.2580(0x28003036) MiniProgramEnv/android"

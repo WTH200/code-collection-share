@@ -115,9 +115,11 @@ HENGAN_OAUTH_BASE = os.getenv("HENGAN_OAUTH_BASE", "https://mshopapi.hengan.cn")
 HENGAN_OAUTH_LOGIN = "/auth/app/anon/oauth/wxappLogin"
 
 NICKNAME = os.getenv("xxh_nickname", "微信用户")
+CACHE_DIR = os.environ.get("CODE_CACHE_DIR", os.path.join(os.path.expanduser("~"), "Documents", "写代码"))
 
-COOKIE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "xxhcookie.json")
+os.makedirs(CACHE_DIR, exist_ok=True)
 
+COOKIE_FILE = os.path.join(CACHE_DIR, "xxhcookie.json")
 USER_AGENT = (
     "Mozilla/5.0 (Linux; Android 13; SM-G9910 Build/TP1A.220624.014) "
     "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Mobile Safari/537.36 "

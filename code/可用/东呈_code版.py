@@ -5,10 +5,9 @@
 QYWX_TOKEN = __import__("os").getenv("QYWX_TOKEN", "")  # 企业微信机器人 Webhook key（机器人地址 ?key= 后面的值，留空不推送）
 
 # ==========================================================
-# 功能说明：code 换 token（含缓存与自动刷新）
-# 机制：本地 code 服务获取微信 code → 换取 token → 缓存到本地 JSON；
-#       下次运行先读取缓存 token，并调用用户信息接口验证是否仍有效；
-#       有效则直接复用（无需再获取 code）；失效或过期则重新获取 code 自动刷新。
+# 功能说明：code 换 DOSSENSESSIONID（含缓存与自动刷新）
+# 机制：本地 code 服务获取微信 code → 东呈 SSO 三步登录 → 缓存会话；
+#       下次运行先校验缓存会话，有效则直接签到，失效自动重新登录。
 # ==========================================================
 
 
@@ -17,32 +16,32 @@ QYWX_TOKEN = __import__("os").getenv("QYWX_TOKEN", "")  # 企业微信机器人 
 
 功能：
   1. 本地 code 服务获取微信 code
-  2. 推断登录接口使用 code 换 access_token / DOSSENSESSIONID
-  3. 每日签到（/selling/checkin/do），code=0 或 121300002 视为成功
+  2. code 走东呈 SSO 三步登录换取 DOSSENSESSIONID
+  3. 授权校验后每日签到（/selling/checkin/new），并查询当日签到状态
   4. PushPlus 推送
   5. 品赞代理，业务请求优先代理，失败直连兜底
 
 环境变量：
-  code 服务列表：127.0.0.1:8088（CODE_SERVER 可覆盖为单个地址）
+  code 服务列表：10.30.9.183:8088（CODE_SERVER 可覆盖为单个地址）
   PLUSPLUS_TOKEN    PushPlus token，可选
   QYWX_TOKEN        企业微信机器人 Webhook key，可选（机器人地址 ?key= 后面的值）
   PROXY_API         品赞代理提取 API，可选
   PROXY_TYPE        http / socks5，默认 http
-  DCJD_BLACKBOX     同盾设备指纹 blackbox，可选（原脚本为抓包变量 dcjd_blackbox）
+  DCJD_BLACKBOX     同盾设备指纹 blackbox，可选（默认用最近抓包值）
 
 依赖：
   pip install requests
   socks5 代理需：
   pip install requests[socks]
 
-⚠️ 原脚本为抓包 token 型（dcjd_token / dcjd_DOSSENSESSIONID / dcjd_blackbox 三个
-   变量），源码无登录接口；登录接口为推断（沿用 campaignapi.dossen.com 同域
-   /selling/wx/login），未经真机验证，失败请抓包核对。
+⚠️ blackbox 是设备指纹，若服务端后续强校验或过期，请重新抓包。
 """
 
+import hashlib
 import json
 import os
 import random
+import sys
 import time
 import traceback
 from datetime import datetime
@@ -54,6 +53,11 @@ import requests
 try:
     import urllib3
 
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
+    if hasattr(sys.stderr, "reconfigure"):
+        sys.stderr.reconfigure(encoding="utf-8")
+
     urllib3.disable_warnings()
 except Exception:
     pass
@@ -63,7 +67,7 @@ APP_NAME = "东呈酒店微信小程序"
 APPID = "wxa4b8c0bda7f71cfc"
 
 SERVERS = [
-    "127.0.0.1:8088",
+    "10.30.9.183:8088",
 ]
 
 if os.getenv("CODE_SERVER"):
@@ -79,22 +83,34 @@ PROXY_FETCH_INTERVAL = 3
 ENABLE_DIRECT_FALLBACK = True
 REQUEST_TIMEOUT = 30
 
+SSO_BASE = "https://login.dossen.com"
+SSO_LOGIN_URL = f"{SSO_BASE}/sso/login"
+SSO_VERIFY_ST_URL = f"{SSO_BASE}/sso/verifySt"
+SSO_GET_SESSION_URL = f"{SSO_BASE}/sso/getSessionId"
+
 BASE_URL = "https://campaignapi.dossen.com"
-LOGIN_URL = f"{BASE_URL}/selling/wx/login"
-CHECKIN_URL = f"{BASE_URL}/selling/checkin/do"
+AUTHORIZE_URL = f"{BASE_URL}/auth/authorizate"
+CHECKIN_URL = f"{BASE_URL}/selling/checkin/new"
 
-BLACKBOX = os.getenv("DCJD_BLACKBOX", "")
+ACTIVITY_QUERY_BASE = "https://selling-activity-query.dossen.com"
+WEEKLY_PAGE_URL = f"{ACTIVITY_QUERY_BASE}/welfare/checkin/weeklyPage"
 
-COOKIE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dcjdcookie.json")
+APP_ACCESS_TOKEN = "04F965AD5B494975BCF9764522B961B2"
+DEFAULT_BLACKBOX = "jMPHy1789629388u2nUgO7WiJb"
+DEFAULT_DISTINCT_ID = "1789629379473-3260631-0ec9963a93117d-10622654"
+BLACKBOX = os.getenv("DCJD_BLACKBOX", DEFAULT_BLACKBOX)
+DISTINCT_ID = os.getenv("DCJD_DISTINCT_ID", DEFAULT_DISTINCT_ID)
+VER = "1.0.7"
+CACHE_DIR = os.environ.get("CODE_CACHE_DIR", os.path.join(os.path.expanduser("~"), "Documents", "写代码"))
 
+os.makedirs(CACHE_DIR, exist_ok=True)
+
+SESSION_FILE = os.path.join(CACHE_DIR, "dossen_session.json")
 USER_AGENT = (
-    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_3_1 like Mac OS X) AppleWebKit/605.1.15 "
-    "(KHTML, like Gecko) Mobile/15E148 MicroMessenger/8.0.48(0x18003030) "
-    "NetType/WIFI Language/zh_CN"
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/144.0.0.0 Safari/537.36 MicroMessenger/7.0.20.1781(0x6700143B) "
+    "NetType/WIFI MiniProgramEnv/Windows WindowsWechat/WMPF WindowsWechat(0x63090a13) UnifiedP"
 )
-
-# DOSSENSESSIONID 按账号（code 服务地址）暂存，随 token 缓存持久化
-SESSION_ID_BY_SERVER: Dict[str, str] = {}
 
 
 def now_text() -> str:
@@ -368,19 +384,20 @@ def get_code(server: str) -> str | None:
         return None
 
 
-def common_headers(token: str | None = None) -> Dict[str, str]:
+def common_headers(session_id: str = "") -> Dict[str, str]:
     headers = {
         "User-Agent": USER_AGENT,
         "Content-Type": "application/json",
         "Dossen-Platform": "WxMiniApp",
-        "Referer": f"https://servicewechat.com/{APPID}/281/page-frame.html",
-        "Accept-Language": "zh-CN,zh",
+        "firstchannel": "DOSSEN",
+        "secondchannel": "DOSSEN_MINIPROGRAM",
+        "DOSSENSESSIONID": session_id,
+        "DOSSENUT": "",
+        "ver": VER,
+        "access_token": APP_ACCESS_TOKEN,
+        "blackbox": BLACKBOX,
+        "Referer": f"https://servicewechat.com/{APPID}/517/page-frame.html",
     }
-    if token:
-        headers["access_token"] = token
-    session_id = SESSION_ID_BY_SERVER.get("_current", "")
-    if session_id:
-        headers["DOSSENSESSIONID"] = session_id
     return headers
 
 
@@ -439,14 +456,17 @@ def extract_session_id(response: requests.Response, data: Any) -> str:
 
 def login_by_code(server: str, code: str, proxies: Dict[str, str] | None) -> Tuple[str | None, Dict[str, Any] | None]:
     try:
-        print("🔐 [登录] 使用 code 换 token")
+        print("🔐 [登录] 使用 code 换 ST")
         response = request_with_proxy(
             "POST",
-            LOGIN_URL,
+            SSO_LOGIN_URL,
             headers=common_headers(),
-            params={
-                "code": code,
-                "appId": APPID,
+            json={
+                "accountType": "3",
+                "loginType": "WECHAT_SILENCE",
+                "title": "登录",
+                "distinctId": DISTINCT_ID,
+                "password": code,
             },
             proxies=proxies,
             server=server,
@@ -458,27 +478,56 @@ def login_by_code(server: str, code: str, proxies: Dict[str, str] | None) -> Tup
         except Exception:
             data = {"raw": response.text[:800]}
 
-        token = extract_token(data)
-        if token:
-            session_id = extract_session_id(response, data)
-            if session_id:
-                SESSION_ID_BY_SERVER["_current"] = session_id
-                print(f"✅ [登录] DOSSENSESSIONID 获取成功: {mask(session_id)}")
-            print(f"✅ [登录] token 获取成功: {mask(token)}")
-            return token, data
+        if not isinstance(data, dict) or data.get("code") != 0:
+            print(f"❌ [登录] SSO 登录失败: {json_preview(data)}")
+            return None, data
+        st = str(data.get("results") or "")
+        if not st:
+            print(f"❌ [登录] 未返回 ST: {json_preview(data)}")
+            return None, data
 
-        print(f"❌ [登录] 未识别 token 字段: {json_preview(data)}")
-        return None, data
+        verify_resp = request_with_proxy(
+            "GET",
+            SSO_VERIFY_ST_URL,
+            headers=common_headers(),
+            params={"st": st},
+            proxies=proxies,
+            server=server,
+            verify=False,
+        )
+        verify_data = verify_resp.json()
+        ut = str(verify_data.get("results") or "") if verify_data.get("code") == 0 else ""
+        if not ut:
+            print(f"❌ [登录] ST 校验失败: {json_preview(verify_data)}")
+            return None, verify_data
+
+        session_resp = request_with_proxy(
+            "GET",
+            SSO_GET_SESSION_URL,
+            headers=common_headers(),
+            params={"ut": ut},
+            proxies=proxies,
+            server=server,
+            verify=False,
+        )
+        session_data = session_resp.json()
+        session_id = str(session_data.get("results") or "") if session_data.get("code") == 0 else ""
+        if not session_id:
+            print(f"❌ [登录] 会话获取失败: {json_preview(session_data)}")
+            return None, session_data
+
+        print(f"✅ [登录] DOSSENSESSIONID 获取成功: {mask(session_id)}")
+        return session_id, session_data
     except Exception as exc:
         print(f"❌ [登录] 请求异常: {exc}")
         return None, None
 
 
-def api_get(server: str, url: str, token: str, proxies: Dict[str, str] | None) -> Dict[str, Any]:
+def api_get(server: str, url: str, session_id: str, proxies: Dict[str, str] | None) -> Dict[str, Any]:
     response = request_with_proxy(
         "GET",
         url,
-        headers=common_headers(token),
+        headers=common_headers(session_id),
         proxies=proxies,
         server=server,
         verify=False,
@@ -492,11 +541,11 @@ def api_get(server: str, url: str, token: str, proxies: Dict[str, str] | None) -
         }
 
 
-def api_post(server: str, url: str, token: str, proxies: Dict[str, str] | None, payload: Dict[str, Any]) -> Dict[str, Any]:
+def api_post(server: str, url: str, session_id: str, proxies: Dict[str, str] | None, payload: Dict[str, Any]) -> Dict[str, Any]:
     response = request_with_proxy(
         "POST",
         url,
-        headers=common_headers(token),
+        headers=common_headers(session_id),
         json=payload,
         proxies=proxies,
         server=server,
@@ -512,96 +561,85 @@ def api_post(server: str, url: str, token: str, proxies: Dict[str, str] | None, 
 
 
 # ====================== Token缓存管理 ======================
-def load_token_cache() -> Dict[str, Any]:
+# ====================== 会话缓存管理 ======================
+def load_session_cache() -> Dict[str, Any]:
     try:
-        if os.path.exists(COOKIE_FILE):
-            with open(COOKIE_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
+        if os.path.exists(SESSION_FILE):
+            with open(SESSION_FILE, "r", encoding="utf-8") as file:
+                return json.load(file)
     except Exception as exc:
         print(f"⚠️ [缓存] 读取失败: {exc}")
     return {}
 
 
-def save_token_cache(cache: Dict[str, Any]) -> None:
+def save_session_cache(cache: Dict[str, Any]) -> None:
     try:
-        with open(COOKIE_FILE, "w", encoding="utf-8") as f:
-            json.dump(cache, f, ensure_ascii=False, indent=2)
-        print("✅ [缓存] Token保存成功")
+        with open(SESSION_FILE, "w", encoding="utf-8") as file:
+            json.dump(cache, file, ensure_ascii=False, indent=2)
+        print("✅ [缓存] 会话保存成功")
     except Exception as exc:
         print(f"❌ [缓存] 保存失败: {exc}")
 
 
-def get_cached_token(server: str) -> str | None:
-    cache = load_token_cache()
-    data = cache.get(server)
-    if data and data.get("token") and data.get("expireTime"):
-        try:
-            expire = datetime.fromisoformat(data["expireTime"]).timestamp() * 1000
-            if time.time() * 1000 < expire - 3600 * 1000:
-                print(f"✅ [缓存] 使用 {server} token")
-                return data["token"]
-        except Exception as exc:
-            print(f"⚠️ [缓存] 过期时间解析异常: {exc}")
+def get_cached_session(server: str) -> str | None:
+    cache = load_session_cache()
+    data = cache.get(server) or {}
+    session_id = str(data.get("sessionId", "") or "")
+    if session_id:
+        print(f"✅ [缓存] 使用 {server} 会话")
+        return session_id
     return None
 
 
-def set_cached_token(server: str, token: str, expire_time: str) -> None:
-    cache = load_token_cache()
+def set_cached_session(server: str, session_id: str) -> None:
+    cache = load_session_cache()
     cache[server] = {
-        "token": token,
-        "expireTime": expire_time,
+        "sessionId": session_id,
         "updateTime": datetime.now().isoformat(),
-        "sessionId": SESSION_ID_BY_SERVER.get("_current", ""),
     }
-    save_token_cache(cache)
+    save_session_cache(cache)
 
 
 def login_with_cache(server: str, proxies: Dict[str, str] | None) -> Tuple[str | None, Dict[str, Any] | None]:
-    """优先使用缓存 token，失效自动 code 刷新
-
-    注意：源脚本仅有签到接口、无只读用户信息接口，缓存 token 在有效期内
-    直接复用（不做网络校验），过期后重新 code 登录。
-    """
-    cache_token = get_cached_token(server)
-    if cache_token:
-        cached = load_token_cache().get(server) or {}
-        session_id = str(cached.get("sessionId", "") or "")
-        if session_id:
-            SESSION_ID_BY_SERVER["_current"] = session_id
-        return cache_token, None
+    session_id = get_cached_session(server)
+    if session_id:
+        auth = api_post(server, AUTHORIZE_URL, session_id, proxies, {})
+        if auth.get("code") == 0:
+            return session_id, auth
+        print(f"⚠️ [缓存] 会话失效: {json_preview(auth)}")
 
     code = get_code(server)
     if not code:
         return None, None
 
-    token, raw_login = login_by_code(server, code, proxies)
-    if not token:
+    session_id, raw_login = login_by_code(server, code, proxies)
+    if not session_id:
         return None, raw_login
 
-    expire_time = None
-    if raw_login and isinstance(raw_login, dict):
-        inner = raw_login.get("data")
-        if isinstance(inner, dict):
-            expire_time = inner.get("expireTime") or inner.get("expire_time")
-            expires_in = inner.get("expiresIn")
-            if not expire_time and isinstance(expires_in, (int, float)) and expires_in > 0:
-                expire_time = datetime.fromtimestamp(time.time() + expires_in).isoformat()
-    if not expire_time:
-        expire_time = datetime.fromtimestamp(time.time() + 24 * 3600).isoformat()
-    elif not isinstance(expire_time, str):
-        expire_time = datetime.fromtimestamp(expire_time / 1000).isoformat()
-    set_cached_token(server, token, expire_time)
-    return token, raw_login
+    set_cached_session(server, session_id)
+    auth = api_post(server, AUTHORIZE_URL, session_id, proxies, {})
+    if auth.get("code") != 0:
+        print(f"❌ [授权] 用户信息获取失败: {json_preview(auth)}")
+        return session_id, auth
+    return session_id, auth
 
 
-def do_checkin(server: str, token: str, proxies: Dict[str, str] | None) -> Tuple[str, str]:
-    resp = api_get(server, CHECKIN_URL, token, proxies)
-    if isinstance(resp.get("code"), int) or "code" in resp:
-        if resp.get("code") == 0 or resp.get("code") == 121300002:
-            points = resp.get("results")
-            msg = f"签到成功，获得 {points} 积分"
-            print(f"✅ [签到] {msg}")
-            return msg, str(points if points is not None else "-")
+def do_checkin(server: str, session_id: str, proxies: Dict[str, str] | None) -> Tuple[str, str]:
+    weekly = api_get(server, WEEKLY_PAGE_URL, session_id, proxies)
+    weekly_results = weekly.get("results") or {}
+    if weekly.get("code") == 0 and weekly_results.get("hasCheckinToday") is True:
+        msg = "今日已签到，无需重复操作"
+        print(f"✅ [签到] {msg}")
+        return msg, "-"
+
+    checkin_url = f"{CHECKIN_URL}?blackbox={quote(BLACKBOX)}"
+    resp = api_get(server, checkin_url, session_id, proxies)
+    if resp.get("code") == 0:
+        results = resp.get("results") or {}
+        points = results.get("point")
+        msg = f"签到成功，获得 {points} 积分"
+        print(f"✅ [签到] {msg}")
+        return msg, str(points if points is not None else "-")
 
     msg = f"签到失败: {json_preview(resp)}"
     print(f"❌ [签到] {msg}")
@@ -614,7 +652,7 @@ def run_account(index: int, total: int, server: str) -> Dict[str, Any]:
         "success": False,
         "proxyStatus": "未使用代理",
         "proxyIp": "-",
-        "token": "-",
+        "session": "-",
         "signMsg": "-",
         "points": "-",
         "error": "",
@@ -635,15 +673,19 @@ def run_account(index: int, total: int, server: str) -> Dict[str, Any]:
     if not BLACKBOX:
         print("⚠️ [签到] 未配置 DCJD_BLACKBOX（同盾设备指纹），若签到失败请自行抓包补充")
 
-    token, raw_login = login_with_cache(server, proxies)
-    if not token:
-        result["error"] = f"登录失败: {json_preview(raw_login)}"
+    session_id, auth = login_with_cache(server, proxies)
+    if not session_id:
+        result["error"] = f"登录失败: {json_preview(auth)}"
         return result
 
-    result["token"] = mask(token)
+    result["session"] = mask(session_id)
+    member = (auth.get("results") or {}) if isinstance(auth, dict) else {}
+    card_no = member.get("cardNO")
+    if card_no:
+        print(f"✅ [授权] 会员卡号: {mask(card_no)}")
 
     try:
-        sign_msg, points = do_checkin(server, token, proxies)
+        sign_msg, points = do_checkin(server, session_id, proxies)
         result["signMsg"] = sign_msg
         result["points"] = points
 

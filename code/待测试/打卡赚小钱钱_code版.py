@@ -79,11 +79,12 @@ SECRET_A = "wq_mof_short_video_by_moufer_2020"
 BASE_B = "https://rr.qq66.cn/app/index.php"
 # 源脚本 getSign 的 secret 为 undefined，实际签名串为 c + '&' + 'undefined'，此处如实复刻
 SECRET_B = "undefined"
+CACHE_DIR = os.environ.get("CODE_CACHE_DIR", os.path.join(os.path.expanduser("~"), "Documents", "写代码"))
 
-DAILY_STATE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "frwz_state.json")
+os.makedirs(CACHE_DIR, exist_ok=True)
 
-COOKIE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dkcookie.json")
-
+DAILY_STATE_FILE = os.path.join(CACHE_DIR, "frwz_state.json")
+COOKIE_FILE = os.path.join(CACHE_DIR, "dkcookie.json")
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36 "

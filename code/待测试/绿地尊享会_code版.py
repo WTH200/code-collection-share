@@ -81,9 +81,11 @@ SIGN_RECORD_URL = f"{BASE_URL}/guardian/api/wechat/platform/sign/wechatSignRecor
 SIGN_AWARD_URL = f"{BASE_URL}/guardian/api/wechat/platform/sign/getWechatSignAward.json"
 
 HOTEL_GROUP_CODE = "GIHG"
+CACHE_DIR = os.environ.get("CODE_CACHE_DIR", os.path.join(os.path.expanduser("~"), "Documents", "写代码"))
 
-COOKIE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "lvdicookie.json")
+os.makedirs(CACHE_DIR, exist_ok=True)
 
+COOKIE_FILE = os.path.join(CACHE_DIR, "lvdicookie.json")
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36 "

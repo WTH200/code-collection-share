@@ -88,9 +88,11 @@ QUIZ_ACTIVITIES_URL = f"{BASE_URL}/mall/xhr/quizActivity/activities"
 QUIZ_SUBMIT_URL = f"{BASE_URL}/mall/xhr/quizActivity/submit"
 COMMUNITY_RECOMMEND_URL = f"{BASE_URL}/mall/xhr/community/home/recommend/item"
 COMMUNITY_PUSH_URL = f"{BASE_URL}/mall/xhr/community/posts/push"
+CACHE_DIR = os.environ.get("CODE_CACHE_DIR", os.path.join(os.path.expanduser("~"), "Documents", "写代码"))
 
-COOKIE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ryytncookie.json")
+os.makedirs(CACHE_DIR, exist_ok=True)
 
+COOKIE_FILE = os.path.join(CACHE_DIR, "ryytncookie.json")
 USER_AGENT = (
     "Mozilla/5.0 (iPhone; CPU iPhone OS 18_3 like Mac OS X) AppleWebKit/605.1.15 "
     "(KHTML, like Gecko) Mobile/15E148 MicroMessenger/8.0.61(0x18003d24) "

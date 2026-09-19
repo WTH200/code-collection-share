@@ -75,9 +75,11 @@ BASE_URL = "https://api-cn.decathlon.com.cn"
 LOGIN_URL = f"{BASE_URL}/membership/membership-portal/mp/api/v1/login"
 VALIDATE_URL = f"{BASE_URL}/membership/membership-portal/mp/api/v1/customer/info"
 CHECK_IN_URL = f"{BASE_URL}/membership/membership-portal/mp/api/v1/business-center/reward/CHECK_IN_DAILY"
+CACHE_DIR = os.environ.get("CODE_CACHE_DIR", os.path.join(os.path.expanduser("~"), "Documents", "写代码"))
 
-COOKIE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dklcookie.json")
+os.makedirs(CACHE_DIR, exist_ok=True)
 
+COOKIE_FILE = os.path.join(CACHE_DIR, "dklcookie.json")
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36 "

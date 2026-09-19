@@ -92,9 +92,11 @@ AUTHORIZE_URL = f"{API_BASE}/wscshop/weapp/authorize.json"
 SHOW_CHECKIN_URL = f"{API_BASE}/wscump/checkin/show_checkin_page_v2.json"
 CHECKIN_URL = f"{API_BASE}/wscump/checkin/checkinV2.json"
 USER_POINTS_URL = f"{API_BASE}/wscump/integral/user_points.json"
+CACHE_DIR = os.environ.get("CODE_CACHE_DIR", os.path.join(os.path.expanduser("~"), "Documents", "写代码"))
 
-COOKIE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "luotuocookie.json")
+os.makedirs(CACHE_DIR, exist_ok=True)
 
+COOKIE_FILE = os.path.join(CACHE_DIR, "luotuocookie.json")
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
     "MicroMessenger/3.9.12 MiniProgramEnv/Windows WindowsWechat/WMPF"

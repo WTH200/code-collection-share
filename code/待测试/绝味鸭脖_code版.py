@@ -87,9 +87,11 @@ REFERER_URL = f"{BASE_URL}/activityMultiport.html"
 # 源脚本内置的两组签名密钥（base64 原样保留）
 BASE_KEY = base64.b64decode("dWgzJEhnJl5ISzg3NiVnYnhWRzdmJCVwPTBNfj5zMXg=").decode("utf-8")
 TOKEN_KEY = base64.b64decode("SjdoOCZeQmdzNSNibio3aG4lIT1raDMwOCpidjIhc14=").decode("utf-8")
+CACHE_DIR = os.environ.get("CODE_CACHE_DIR", os.path.join(os.path.expanduser("~"), "Documents", "写代码"))
 
-COOKIE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "jwybcookie.json")
+os.makedirs(CACHE_DIR, exist_ok=True)
 
+COOKIE_FILE = os.path.join(CACHE_DIR, "jwybcookie.json")
 USER_AGENT = (
     "Mozilla/5.0 (iPhone; CPU iPhone OS 18_3_1 like Mac OS X) AppleWebKit/605.1.15 "
     "(KHTML, like Gecko) Mobile/15E148 MicroMessenger/8.0.56(0x1800383b) NetType/WIFI "

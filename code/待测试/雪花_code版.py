@@ -79,9 +79,11 @@ BASE_URL = "https://superx.crb.cn"
 LOGIN_URL = f"{BASE_URL}/Api/wxapp/login"  # ⚠️ 推断端点
 SIGN_URL = f"{BASE_URL}/Api/sign/addSign"
 USER_INFO_URL = f"{BASE_URL}/Api/b1/GetUserInfo"
+CACHE_DIR = os.environ.get("CODE_CACHE_DIR", os.path.join(os.path.expanduser("~"), "Documents", "写代码"))
 
-COOKIE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "xuehuacookie.json")
+os.makedirs(CACHE_DIR, exist_ok=True)
 
+COOKIE_FILE = os.path.join(CACHE_DIR, "xuehuacookie.json")
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) "
     "Chrome/81.0.4044.138 Safari/537.36 MicroMessenger/7.0.4.501 NetType/WIFI "

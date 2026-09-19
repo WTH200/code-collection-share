@@ -79,9 +79,11 @@ ROKI_APP_ID = "roki_app"
 SIGN_SECRET = "ee8694419924a22f04ac0e01368683521daa659f"
 AES_SECRET = "1234567890123456"
 APP_VERSION = 5000
+CACHE_DIR = os.environ.get("CODE_CACHE_DIR", os.path.join(os.path.expanduser("~"), "Documents", "写代码"))
 
-COOKIE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "rokicookie.json")
+os.makedirs(CACHE_DIR, exist_ok=True)
 
+COOKIE_FILE = os.path.join(CACHE_DIR, "rokicookie.json")
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) MicroMessenger/3.9.12 "
     "MiniProgramEnv/Windows WindowsWechat/WMPF"

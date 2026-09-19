@@ -75,9 +75,11 @@ BASE_URL = "https://gwuop.bsdits.cn"
 LOGIN_URL = f"{BASE_URL}/points-mall/front/login"
 RECORD_URL_TEMPLATE = f"{BASE_URL}/points-mall/front/member/{{union_id}}/activities/1/records"
 SIGN_URL = f"{BASE_URL}/points-mall/front/points/"
+CACHE_DIR = os.environ.get("CODE_CACHE_DIR", os.path.join(os.path.expanduser("~"), "Documents", "写代码"))
 
-COOKIE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bosidengcookie.json")
+os.makedirs(CACHE_DIR, exist_ok=True)
 
+COOKIE_FILE = os.path.join(CACHE_DIR, "bosidengcookie.json")
 USER_AGENT = (
     "Mozilla/5.0 (Linux; Android 10; MI 8 Lite Build/QKQ1.190910.002; wv) "
     "AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/122.0.6261.120 Mobile Safari/537.36 "

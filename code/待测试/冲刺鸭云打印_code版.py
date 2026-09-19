@@ -84,9 +84,11 @@ EXCHANGE_URL = f"{EWEI_ENTRY}?i=2&c=entry&m=ewei_shopv2&do=mobile&r=api.index.jf
 
 # 1 积分 = 0.1 元（源脚本 pointsRules.pointToMoneyRatio）
 POINT_TO_MONEY_RATIO = 0.1
+CACHE_DIR = os.environ.get("CODE_CACHE_DIR", os.path.join(os.path.expanduser("~"), "Documents", "写代码"))
 
-COOKIE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ccycookie.json")
+os.makedirs(CACHE_DIR, exist_ok=True)
 
+COOKIE_FILE = os.path.join(CACHE_DIR, "ccycookie.json")
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36 "

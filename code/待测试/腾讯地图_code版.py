@@ -78,9 +78,11 @@ LOGIN_SECRET_KEY = "4300eec60bedec22a73408a0d76b03ec"
 TMAP_SECRET = "3a9875e795c3ecff15f617085e72d4cc"
 CHECKIN_TOKEN = "e643d512f085d621bf6c9e80310d0498"
 ACTIVITY_ID = 1721983577
+CACHE_DIR = os.environ.get("CODE_CACHE_DIR", os.path.join(os.path.expanduser("~"), "Documents", "写代码"))
 
-COOKIE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "txdtcookie.json")
+os.makedirs(CACHE_DIR, exist_ok=True)
 
+COOKIE_FILE = os.path.join(CACHE_DIR, "txdtcookie.json")
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) MicroMessenger/3.9.12 "
     "MiniProgramEnv/Windows WindowsWechat/WMPF"

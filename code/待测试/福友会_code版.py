@@ -85,9 +85,11 @@ COUPON_URL = f"{API_BASE}/online/capi/cp/receiveCoupon?cpId="
 APP_KEY = "WX_MINI_TC"
 MEMBER_CODE = "foryouclub_minipro_regs"
 SIGN_SALT = "3d83f7d9"
+CACHE_DIR = os.environ.get("CODE_CACHE_DIR", os.path.join(os.path.expanduser("~"), "Documents", "写代码"))
 
-COOKIE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fyhcookie.json")
+os.makedirs(CACHE_DIR, exist_ok=True)
 
+COOKIE_FILE = os.path.join(CACHE_DIR, "fyhcookie.json")
 USER_AGENT = "Mozilla/5.0 MicroMessenger MiniProgramEnv/Windows"
 
 

@@ -99,9 +99,11 @@ PROXY_VALIDATE_URL = "http://httpbin.org/ip"
 PROXY_FETCH_INTERVAL = 3
 ENABLE_DIRECT_FALLBACK = True
 REQUEST_TIMEOUT = 30
+CACHE_DIR = os.environ.get("CODE_CACHE_DIR", os.path.join(os.path.expanduser("~"), "Documents", "写代码"))
 
-COOKIE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "zippo_cookies.json")
+os.makedirs(CACHE_DIR, exist_ok=True)
 
+COOKIE_FILE = os.path.join(CACHE_DIR, "zippo_cookies.json")
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36 "

@@ -76,9 +76,11 @@ LOGIN_URL = f"{BASE_URL}/api/users/wxLogin"
 USER_DETAIL_URL = f"{BASE_URL}/api/users/getUserDetailInfo"
 SIGN_IN_URL = f"{BASE_URL}/api/signInLog/addSignIn"
 POINTS_URL = f"{BASE_URL}/api/userRight/getUserRightDetail"
+CACHE_DIR = os.environ.get("CODE_CACHE_DIR", os.path.join(os.path.expanduser("~"), "Documents", "写代码"))
 
-COOKIE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "hzhfpcookie.json")
+os.makedirs(CACHE_DIR, exist_ok=True)
 
+COOKIE_FILE = os.path.join(CACHE_DIR, "hzhfpcookie.json")
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36 "

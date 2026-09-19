@@ -94,9 +94,11 @@ DEFAULT_STORES = [
     {"name": "Xbox 聚乐部", "appId": "wx7f4f694622875202", "kdtId": "100464643", "checkinId": "1597464"},
     {"name": "MAMMUT 1862 猛犸象", "appId": "wxccbbf1b55ddaa627", "kdtId": "146288343", "checkinId": "4296415"},
 ]
+CACHE_DIR = os.environ.get("CODE_CACHE_DIR", os.path.join(os.path.expanduser("~"), "Documents", "写代码"))
 
-COOKIE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "yztycookie.json")
+os.makedirs(CACHE_DIR, exist_ok=True)
 
+COOKIE_FILE = os.path.join(CACHE_DIR, "yztycookie.json")
 USER_AGENT = (
     "Mozilla/5.0 (Linux; Android 10; 16th Build/QKQ1.191222.002; wv) "
     "AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/116.0.0.0 Mobile "

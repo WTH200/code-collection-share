@@ -127,9 +127,11 @@ for _app in APPS:
         _known = {str(shop["shopId"]) for shop in _app["shops"]}
         _kept += [{"shopId": sid, "shopName": f"门店{sid}"} for sid in _shop_ids if sid not in _known]
         _app["shops"] = _kept
+CACHE_DIR = os.environ.get("CODE_CACHE_DIR", os.path.join(os.path.expanduser("~"), "Documents", "写代码"))
 
-COOKIE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "jjxallcookie.json")
+os.makedirs(CACHE_DIR, exist_ok=True)
 
+COOKIE_FILE = os.path.join(CACHE_DIR, "jjxallcookie.json")
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) MicroMessenger/3.9.12 "
     "MiniProgramEnv/Windows WindowsWechat/WMPF"

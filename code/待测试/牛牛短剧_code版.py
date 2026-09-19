@@ -78,9 +78,11 @@ LOGIN_REG_URL = f"{API_BASE}/app/Login/insertWxUser"
 CHECK_USER_URL = f"{API_BASE}/app/user/selectUserById"
 POINTS_URL = f"{API_BASE}/app/integral/selectByUserId"
 SIGN_IN_URL = f"{API_BASE}/app/integral/signIn"
+CACHE_DIR = os.environ.get("CODE_CACHE_DIR", os.path.join(os.path.expanduser("~"), "Documents", "写代码"))
 
-COOKIE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "nndjcookie.json")
+os.makedirs(CACHE_DIR, exist_ok=True)
 
+COOKIE_FILE = os.path.join(CACHE_DIR, "nndjcookie.json")
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) "

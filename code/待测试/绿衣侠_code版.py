@@ -74,9 +74,11 @@ BASE_URL = "https://www.kuaishouxia.cn"
 LOGIN_URL = f"{BASE_URL}/app/api/user/login"
 CHECKIN_URL = f"{BASE_URL}/app/api/user/checkin"
 USER_INFO_URL = f"{BASE_URL}/app/api/user/v2/get"
+CACHE_DIR = os.environ.get("CODE_CACHE_DIR", os.path.join(os.path.expanduser("~"), "Documents", "写代码"))
 
-COOKIE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "lvyixiacookie.json")
+os.makedirs(CACHE_DIR, exist_ok=True)
 
+COOKIE_FILE = os.path.join(CACHE_DIR, "lvyixiacookie.json")
 USER_AGENT = (
     "Mozilla/5.0 (iPhone; CPU iPhone OS 17_6_1 like Mac OS X) "
     "AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 "

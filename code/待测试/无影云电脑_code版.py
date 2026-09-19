@@ -101,9 +101,11 @@ _manual_session_lines = [
     if x.strip()
 ]
 MANUAL_SESSIONS: Dict[str, str] = {server: value for server, value in zip(SERVERS, _manual_session_lines)}
+CACHE_DIR = os.environ.get("CODE_CACHE_DIR", os.path.join(os.path.expanduser("~"), "Documents", "写代码"))
 
-COOKIE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "wuyingcookie.json")
+os.makedirs(CACHE_DIR, exist_ok=True)
 
+COOKIE_FILE = os.path.join(CACHE_DIR, "wuyingcookie.json")
 USER_AGENT = (
     "Mozilla/5.0 (Linux; Android 13; SM-G9910 Build/TP1A.220624.014) "
     "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Mobile Safari/537.36 "

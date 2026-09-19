@@ -77,9 +77,11 @@ REQUEST_TIMEOUT = 30
 BASE_URL = "https://hongke.changhong.com"
 LOGIN_URL = f"{BASE_URL}/gw/applet/login"
 SIGN_URL = f"{BASE_URL}/gw/applet/aggr/signin?aggrId=661"
+CACHE_DIR = os.environ.get("CODE_CACHE_DIR", os.path.join(os.path.expanduser("~"), "Documents", "写代码"))
 
-COOKIE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "chmlcookie.json")
+os.makedirs(CACHE_DIR, exist_ok=True)
 
+COOKIE_FILE = os.path.join(CACHE_DIR, "chmlcookie.json")
 USER_AGENT = (
     "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5_1 like Mac OS X) AppleWebKit/605.1.15 "
     "(KHTML, like Gecko) Mobile/15E148 MicroMessenger/8.0.50(0x1800322d) NetType/WIFI Language/zh_CN"

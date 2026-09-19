@@ -89,9 +89,11 @@ CREDITS_EXCHANGE_URL = f"{BASE_URL}/v3/credits-exchange"
 
 AES_KEY = "Kj8mN2pQ9rS5tU7vW3xY1zA4bC6dE8fG"
 AES_IV = "H7nM4kL9pQ2rS5tU"
+CACHE_DIR = os.environ.get("CODE_CACHE_DIR", os.path.join(os.path.expanduser("~"), "Documents", "写代码"))
 
-COOKIE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "lysghcookie.json")
+os.makedirs(CACHE_DIR, exist_ok=True)
 
+COOKIE_FILE = os.path.join(CACHE_DIR, "lysghcookie.json")
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36 "

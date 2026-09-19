@@ -85,9 +85,11 @@ LOGIN_PATH = "wscshop/weapp/authorize.json"
 CHECKIN_INFO_PATH = "wscump/checkin/check-in-info.json"
 CHECKIN_PATH = "wscump/checkin/checkinV2.json"
 MEMBER_INIT_PATH = "wscuser/membercenter/init-data.json"
+CACHE_DIR = os.environ.get("CODE_CACHE_DIR", os.path.join(os.path.expanduser("~"), "Documents", "写代码"))
 
-COOKIE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "qieyoucookie.json")
+os.makedirs(CACHE_DIR, exist_ok=True)
 
+COOKIE_FILE = os.path.join(CACHE_DIR, "qieyoucookie.json")
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36 "
