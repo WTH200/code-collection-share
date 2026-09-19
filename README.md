@@ -170,6 +170,13 @@ git clone https://github.com/L0NE-6/code-collection-share.git
 cd code-collection-share
 ```
 
+## 反馈与贡献
+
+使用中遇到问题、脚本失效或有改进想法，欢迎提 Issue 或 Pull Request：
+
+- 提交 Issue：https://github.com/L0NE-6/code-collection-share/issues
+- 提交 Pull Request：https://github.com/L0NE-6/code-collection-share/pulls
+
 ## 免责声明
 
 本仓库仅用于学习与个人自动化研究。请勿将脚本用于任何违反平台规则或法律法规的用途，使用风险由使用者自行承担。
